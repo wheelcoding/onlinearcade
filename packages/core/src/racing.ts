@@ -217,9 +217,10 @@ export function advanceCheckpoint(
   laps: number,
   progress: number,
   onRoad: boolean,
+  movingForward = true,
 ) {
   const gate = Math.floor((((progress % 1) + 1) % 1) * CHECKPOINTS);
-  if (onRoad && gate === (lastGate + 1) % CHECKPOINTS)
+  if (onRoad && movingForward && gate === (lastGate + 1) % CHECKPOINTS)
     return { lastGate: gate, laps: laps + (gate === 0 ? 1 : 0) };
   return { lastGate, laps };
 }

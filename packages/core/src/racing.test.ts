@@ -36,6 +36,10 @@ test("lap credit needs every gate in order and ignores reverse, skipped and offr
   let state = { lastGate: 0, laps: 0 };
   assert.deepEqual(advanceCheckpoint(0, 0, 0.5, true), state);
   assert.deepEqual(
+    advanceCheckpoint(0, 0, 1 / CHECKPOINTS + 0.001, true, false),
+    state,
+  );
+  assert.deepEqual(
     advanceCheckpoint(0, 0, 1 / CHECKPOINTS + 0.001, false),
     state,
   );

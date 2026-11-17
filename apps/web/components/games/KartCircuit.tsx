@@ -377,6 +377,9 @@ export default function KartCircuit({
             laps,
             road.progress,
             road.distance <= track.width / 2 + 0.25,
+            (Math.sin(heading) * road.tx + Math.cos(heading) * road.tz) *
+              speed >
+              0.5,
           );
           if (next.laps > laps) {
             lastLap = elapsed - lapStart;
