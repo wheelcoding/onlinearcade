@@ -23,11 +23,12 @@ npm run build
 
 - `apps/web`: Next.js app, Tailwind styling, game catalog, local profile/records, lazy-loaded Phaser game.
 - `apps/server`: Node HTTP / Socket.IO party server, integration tests.
-- `packages/games`: Three.js kart scene foundation. Not exposed as playable.
+- `packages/games`: reusable Three.js scene experiments. The playable kart engine lives in `apps/web/components/games`.
+- `packages/core`: shared game IDs, records, puzzle/collision logic, and future account/leaderboard contracts.
 
 ## Neon Dash
 
-Use Left/Right arrows to move and Space/Up to jump. On touch devices tap the game or Jump button. Dodge obstacles, build a score, and restart after a collision. Records persist in this browser, and are not verified global scores. The game loads only when launched.
+Use Left/Right arrows or A/D to move and Space/Up to double jump. Collect gold shards for a score bonus. On touch devices tap the game or Jump button. Dodge obstacles, build a score, and restart after a collision. Records persist in this browser, and are not verified global scores. The game loads only when launched.
 
 ## Multiplayer scope
 
@@ -41,15 +42,13 @@ Server validates actions, names, codes, capacity and host permissions. Each sock
 
 Set `NEXT_PUBLIC_MULTIPLAYER_URL` **before building** the web app to your public HTTPS Socket.IO server URL. Set server `WEB_ORIGIN` to the exact frontend origin (comma separated if multiple), and optionally `PORT` (default 3001). See `.env.example`. Without a reachable server the frontend displays an offline state and local Neon Dash remains playable. Sites static hosting cannot run this persistent Node server; deploy it separately.
 
-Future games are explicitly marked in development and have no launch controls. Shooter and puzzle categories show honest empty states. Leaderboards show browser-local runs, high score and total score; verified wins are deferred.
+Future games are explicitly marked in development and have no launch controls. Leaderboards show browser-local per-game runs, high score and total score; verified wins are deferred.
 
 ## GitHub Pages
 
 The `Deploy GitHub Pages` workflow publishes the static frontend at
 https://wheelcoding.github.io/onlinearcade/ using the `/onlinearcade` Next.js base path.
-It deploys pushes to `main` and the initial `feat/onlinearcade-foundation` branch,
-so the open foundation PR can be previewed without merging it. After merging,
-remove the development branch from the workflow's push triggers.
+It deploys pushes to `main`; development branches run CI without publishing.
 
 Pages repository settings must use **GitHub Actions** as the build source.
 Optionally set the repository Actions variable `NEXT_PUBLIC_MULTIPLAYER_URL`
@@ -62,3 +61,13 @@ To build the Pages version locally:
 ```sh
 NEXT_PUBLIC_BASE_PATH=/onlinearcade npm run build
 ```
+
+## Expanded arcade
+
+Five playable games now ship: **Neon Dash** (double-jump runner and collectible shards), **Sunset Circuit** (Three.js 3D kart time trial, 3 laps), **Starfall** (auto-fire survival shooter), **Prism Break** (48-crystal brick breaker), and **Tile Shift** (solvable 15-puzzle). Cloudbound and Party Planet remain marked in development.
+
+Every game includes keyboard/touch controls and restart. New games share pause, fullscreen, instructions, an end-of-run overlay and cleanup of engine resources. The new game art is original inline SVG; the engines draw procedural graphics. No external assets are required.
+
+Scores are per game; old Neon Dash records migrate to the versioned format automatically. Only completed runs are recorded. New engines pause when the page is hidden. 3D racing requires WebGL and shows an error if unavailable. Time trial uses sequential track checkpoints; this is casual local scoring, not a server anti-cheat system.
+
+`packages/core` contains game IDs, progress validation, tested puzzle/collision logic and future account/leaderboard service contracts. Read [account architecture](docs/accounts-and-leaderboards.md) for the identity, authenticated API, database, guest-import and score-verification extension plan. Cross-device sync and sign-in are not enabled yet.

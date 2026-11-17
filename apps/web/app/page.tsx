@@ -1,6 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import {
+  emptyProgress,
+  emptyStats,
+  recordRun,
+  type GameId,
+  type LocalProgress,
+} from "@onlinearcade/core";
+import { games, gameById, playableGames } from "../lib/catalog";
+import { BrowserProgressRepository } from "../lib/progress";
+import GameArtwork from "../components/GameArtwork";
 import { io, Socket } from "socket.io-client";
 import {
   Gamepad2,
@@ -17,8 +27,6 @@ import {
   PartyPopper,
   Puzzle,
   Joystick,
-  Volume2,
-  Globe,
   Plus,
   Check,
   Copy,
@@ -26,6 +34,10 @@ import {
 const NeonDash = dynamic(() => import("../components/NeonDash"), {
   ssr: false,
   loading: () => <div className="modal">Loading game…</div>,
+});
+const GamePlayer = dynamic(() => import("../components/GamePlayer"), {
+  ssr: false,
+  loading: () => <div className="modal">Loading game engine…</div>,
 });
 const categories = [
   ["All games", Gamepad2],
@@ -36,58 +48,22 @@ const categories = [
   ["Puzzles", Puzzle],
   ["Arcade", Joystick],
 ] as const;
-const games = [
-  {
-    title: "Neon Dash",
-    category: "Arcade",
-    type: "2D · SOLO",
-    art: "neon",
-    tag: "READY TO PLAY",
-    desc: "One more jump. One more high score.",
-  },
-  {
-    title: "Sunset Circuit",
-    category: "Racing",
-    type: "3D · MULTIPLAYER",
-    art: "racing",
-    tag: "IN DEVELOPMENT",
-    desc: "A little drift. A lot of friendly rivalry.",
-  },
-  {
-    title: "Cloudbound",
-    category: "Parkour",
-    type: "3D · SOLO",
-    art: "cloud",
-    tag: "IN DEVELOPMENT",
-    desc: "The only way is up.",
-  },
-  {
-    title: "Party Planet",
-    category: "Party Games",
-    type: "2D · MULTIPLAYER",
-    art: "party",
-    tag: "IN DEVELOPMENT",
-    desc: "Small games. Big friendships.",
-  },
-];
 type Party = {
   code: string;
   host: string;
   players: { id: string; name: string }[];
   session: string | null;
 };
-type RecordData = { best: number; runs: number; total: number };
+
 export default function Home() {
   const [category, setCategory] = useState("All games"),
     [query, setQuery] = useState(""),
-    [playing, setPlaying] = useState(false),
+    [playing, setPlaying] = useState<GameId | null>(null),
     [profile, setProfile] = useState(false),
     [name, setName] = useState("Player"),
-    [records, setRecords] = useState<RecordData>({
-      best: 0,
-      runs: 0,
-      total: 0,
-    }),
+    [progress, setProgress] = useState<LocalProgress>(emptyProgress),
+    [boardGame, setBoardGame] = useState<GameId>("neon-dash"),
+    [storageNotice, setStorageNotice] = useState(""),
     [socket, setSocket] = useState<Socket | null>(null),
     [online, setOnline] = useState<number | null>(null),
     [connection, setConnection] = useState("Connecting"),
@@ -99,14 +75,7 @@ export default function Home() {
     [copied, setCopied] = useState(false);
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem("oa-records") || "null");
-      if (
-        saved &&
-        Number.isFinite(saved.best) &&
-        Number.isFinite(saved.runs) &&
-        Number.isFinite(saved.total)
-      )
-        setRecords(saved);
+      setProgress(new BrowserProgressRepository(localStorage).load());
       setName(localStorage.getItem("oa-name") || "Player");
     } catch {}
     const endpoint =
@@ -142,7 +111,7 @@ export default function Home() {
       );
       timer = setTimeout(
         () => {
-          setPlaying(true);
+          setPlaying("neon-dash");
           setNotice("");
         },
         Math.max(0, data.startsAt - Date.now()),
@@ -174,18 +143,24 @@ export default function Home() {
         },
       );
   }
-  function saveScore(score: number) {
-    setRecords((prev) => {
-      const next = {
-        best: Math.max(prev.best, score),
-        runs: prev.runs + 1,
-        total: prev.total + score,
-      };
-      try {
-        localStorage.setItem("oa-records", JSON.stringify(next));
-      } catch {}
-      return next;
-    });
+  const records = progress.games[boardGame] || emptyStats();
+  function saveScore(gameId: GameId, score: number) {
+    // Persist outside React state updaters: Strict Mode may invoke updaters twice.
+    let next: LocalProgress;
+    try {
+      next = recordRun(progress, gameId, score);
+    } catch {
+      return;
+    }
+    setProgress(next);
+    setBoardGame(gameId);
+    try {
+      new BrowserProgressRepository(localStorage).save(next);
+    } catch {
+      setStorageNotice(
+        "Browser storage is unavailable. Your scores will last for this visit only.",
+      );
+    }
   }
   const filtered = games.filter(
     (g) =>
@@ -220,17 +195,23 @@ export default function Home() {
         <section className="hero">
           <div className="hero-copy">
             <span className="pill">
-              <span className="dot" /> GOOD TIMES, JUST A CLICK AWAY
+              <span className="dot" /> YOUR NEXT HIGH SCORE STARTS HERE
             </span>
             <h1>
-              Welcome to
+              Less waiting.
               <br />
-              <em>OnlineArcade</em>
+              <em>More playing.</em>
               <span className="spark">✳</span>
             </h1>
-            <p>Your arcade. Your friends. Your games.</p>
+            <p>
+              Your arcade. Your friends. Your games. Five original worlds, one
+              more round.
+            </p>
             <div className="hero-actions">
-              <button className="primary" onClick={() => setPlaying(true)}>
+              <button
+                className="primary"
+                onClick={() => setPlaying("neon-dash")}
+              >
                 <Gamepad2 size={19} /> Play Now <ArrowUpRight size={18} />
               </button>
               <a className="secondary" href="#games">
@@ -249,52 +230,27 @@ export default function Home() {
               </span>
             </div>
           </div>
-          <div
-            className="hero-art"
-            aria-label="Original colorful arcade machine illustration"
-            role="img"
+          <button
+            className="featured-world"
+            onClick={() => setPlaying("sunset-circuit")}
+            aria-label="Play Sunset Circuit 3D time trial"
           >
-            <div className="orbit orbit-one" />
-            <div className="orbit orbit-two" />
-            <span className="float-star star-one">✦</span>
-            <span className="float-star star-two">✳</span>
-            <div className="floating-label">
-              <Zap size={16} fill="currentColor" /> INSERT GOOD TIMES
+            <GameArtwork game={gameById("sunset-circuit")} />
+            <div className="featured-top">
+              <span className="pill">
+                <span className="dot" /> NEW WORLD UNLOCKED
+              </span>
+              <span className="dimension-badge">3D</span>
             </div>
-            <div className="arcade-machine">
-              <div className="machine-top">
-                ONLINE<span>★</span>ARCADE
-              </div>
-              <div className="machine-screen">
-                <div className="screen-sun" />
-                <div className="screen-mountains" />
-                <div className="screen-grid" />
-                <div className="screen-text">
-                  LET’S
-                  <br />
-                  PLAY<span>PRESS START ▸</span>
-                </div>
-              </div>
-              <div className="machine-controls">
-                <div className="stick" />
-                <i />
-                <i />
-                <i />
-              </div>
-              <div className="machine-base">
-                <span>✦</span>
-                <div />
-                <b>01</b>
-              </div>
+            <div className="featured-bottom">
+              <span className="eyebrow">TAKE THE SCENIC ROUTE</span>
+              <h2>Sunset Circuit</h2>
+              <p>Golden skies. Tight corners. Your fastest lap.</p>
+              <span className="featured-play">
+                Jump in <ArrowUpRight size={18} />
+              </span>
             </div>
-            <div className="float-card">
-              <span>✌</span>
-              <div>
-                Better together<small>Bring your favorite people.</small>
-              </div>
-            </div>
-            <span className="art-caption">LESS SCROLLING. MORE PLAYING.</span>
-          </div>
+          </button>
         </section>
         <div className="ticker">
           <span>
@@ -342,62 +298,13 @@ export default function Home() {
             ))}
           </div>
           <div className="game-grid">
-            {filtered.map((g, i) => (
+            {filtered.map((g) => (
               <article className="game-card" key={g.title}>
                 <div className={`thumbnail ${g.art}`}>
-                  <span
-                    className={`game-tag ${g.title === "Neon Dash" ? "ready" : ""}`}
-                  >
+                  <span className={`game-tag ${g.playable ? "ready" : ""}`}>
                     {g.tag}
                   </span>
-                  <div className="thumb-art" aria-hidden="true">
-                    {g.art === "neon" ? (
-                      <>
-                        <div className="neon-moon" />
-                        <div className="neon-city" />
-                        <div className="neon-floor" />
-                        <div className="neon-runner" />
-                        <strong>
-                          NEON
-                          <br />
-                          <em>DASH</em>
-                        </strong>
-                      </>
-                    ) : g.art === "racing" ? (
-                      <>
-                        <div className="race-sun" />
-                        <div className="road" />
-                        <span className="kart">🏎</span>
-                        <strong>
-                          SUNSET
-                          <br />
-                          <em>CIRCUIT</em>
-                        </strong>
-                      </>
-                    ) : g.art === "cloud" ? (
-                      <>
-                        <span className="cloud c1">☁</span>
-                        <span className="cloud c2">☁</span>
-                        <div className="platform p1" />
-                        <div className="platform p2" />
-                        <strong>
-                          CLOUD
-                          <br />
-                          <em>BOUND</em>
-                        </strong>
-                      </>
-                    ) : (
-                      <>
-                        <span className="planet" />
-                        <span className="party-face">✿</span>
-                        <strong>
-                          PARTY
-                          <br />
-                          <em>PLANET</em>
-                        </strong>
-                      </>
-                    )}
-                  </div>
+                  <GameArtwork game={g} />
                   <span className="game-type">{g.type}</span>
                 </div>
                 <div className="game-info">
@@ -406,14 +313,14 @@ export default function Home() {
                   <p>{g.desc}</p>
                   <div className="game-footer">
                     <span>
-                      {g.title === "Neon Dash"
+                      {g.playable
                         ? "↗ Chase your personal best"
                         : "Something good is on the way"}
                     </span>
-                    {g.title === "Neon Dash" ? (
+                    {g.playable ? (
                       <button
-                        onClick={() => setPlaying(true)}
-                        aria-label="Play Neon Dash"
+                        onClick={() => setPlaying(g.id as GameId)}
+                        aria-label={`Play ${g.title}`}
                       >
                         Play <ArrowUpRight size={16} />
                       </button>
@@ -433,7 +340,7 @@ export default function Home() {
             </div>
           )}
           <p className="library-note">
-            A small arcade with big plans. New worlds are in the works.{" "}
+            Five playable originals. Fresh challenges. No downloads.{" "}
             <span>Stay for one more round. ↗</span>
           </p>
         </section>
@@ -580,6 +487,23 @@ export default function Home() {
               <Trophy size={15} /> Local records
             </span>
           </div>
+          <div className="board-filters" aria-label="Leaderboard game">
+            {playableGames.map((g) => (
+              <button
+                key={g.id}
+                aria-pressed={boardGame === g.id}
+                className={boardGame === g.id ? "selected" : ""}
+                onClick={() => setBoardGame(g.id as GameId)}
+              >
+                {g.title}
+              </button>
+            ))}
+          </div>
+          {storageNotice && (
+            <p className="error" role="status">
+              {storageNotice}
+            </p>
+          )}
           <div className="record-layout">
             <div className="ranking">
               <div className="ranking-head">
@@ -603,22 +527,23 @@ export default function Home() {
                   <div>
                     No records. Yet.
                     <small>
-                      Finish your first Neon Dash run to take the top spot.
+                      Finish a {gameById(boardGame).title} run to set your first
+                      record.
                     </small>
                   </div>
-                  <button onClick={() => setPlaying(true)}>
+                  <button onClick={() => setPlaying(boardGame)}>
                     Let’s play <ArrowUpRight size={16} />
                   </button>
                 </div>
               )}
               <p>
-                Records are saved on this browser. Global rankings and verified
-                wins are coming later.
+                {gameById(boardGame).title} · Records are saved on this browser.
+                Account sync and verified global rankings are planned.
               </p>
             </div>
             <div className="stat-box">
               <Zap size={23} />
-              <span>YOUR TOTAL SCORE</span>
+              <span>TOTAL SCORE · THIS GAME</span>
               <strong>{records.total.toLocaleString()}</strong>
               <small>Every run counts.</small>
             </div>
@@ -634,8 +559,19 @@ export default function Home() {
           </span>
         </footer>
       </main>
-      {playing && (
-        <NeonDash onClose={() => setPlaying(false)} onScore={saveScore} />
+      {playing === "neon-dash" && (
+        <NeonDash
+          onClose={() => setPlaying(null)}
+          onScore={(score) => saveScore("neon-dash", score)}
+        />
+      )}
+      {playing && playing !== "neon-dash" && (
+        <GamePlayer
+          key={playing}
+          gameId={playing}
+          onClose={() => setPlaying(null)}
+          onScore={(score) => saveScore(playing, score)}
+        />
       )}
       {profile && (
         <div
@@ -654,7 +590,10 @@ export default function Home() {
             </button>
             <span className="eyebrow">YOUR CORNER OF THE ARCADE</span>
             <h2>Hey, {name}.</h2>
-            <p>Your profile is stored on this browser.</p>
+            <p>
+              Your profile and game records are stored on this browser. Accounts
+              and cross-device sync are planned.
+            </p>
             <label className="field-label">
               Display name
               <input

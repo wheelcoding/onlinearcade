@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0",
     "build": "next build",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "tsx --test lib/*.test.ts"
   },
   "dependencies": {
     "next": "^15.5.12",
@@ -14,11 +15,15 @@
     "socket.io-client": "^4.8.1",
     "lucide-react": "^0.468.0",
     "tailwindcss": "^4.1.0",
-    "@tailwindcss/postcss": "^4.1.0"
+    "@tailwindcss/postcss": "^4.1.0",
+    "@onlinearcade/core": "*",
+    "three": "^0.180.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0"
+    "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.180.0",
+    "tsx": "^4.20.0"
   }
 }
