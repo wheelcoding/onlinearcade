@@ -85,6 +85,7 @@ export type LeaderboardEntry = {
 export type RunTicket = {
   runId: string;
   gameId: GameId;
+  variantId?: string;
   rulesVersion: string;
   seed: number;
   expiresAt: string;
@@ -95,8 +96,9 @@ export interface LeaderboardService {
     gameId: GameId,
     seasonId: string,
     cursor?: string,
+    variantId?: string,
   ): Promise<{ entries: LeaderboardEntry[]; nextCursor?: string }>;
-  startRun(gameId: GameId): Promise<RunTicket>;
+  startRun(gameId: GameId, variantId?: string): Promise<RunTicket>;
   finishRun(
     runId: string,
     inputs: GameInput[],
@@ -150,3 +152,4 @@ export function circleHitsBox(
     nearY = Math.max(b.y, Math.min(y, b.y + b.height));
   return (x - nearX) ** 2 + (y - nearY) ** 2 <= r * r;
 }
+export * from "./racing";

@@ -30,3 +30,7 @@ Current games use frame-based/browser input and some non-seeded randomness. Befo
 ## Verification
 
 Shared tests cover separate records, migration, malformed data, deterministic solvable tile shuffles, legal moves and collision boundaries. Party integration tests still use two real Socket.IO clients. The SQL is a reviewed starting schema and has not been executed against a provisioned PostgreSQL database.
+
+## World Tour track identity
+
+Racing rules version 2 introduces stable variant IDs: `sunset-bay`, `alpine-pass`, `ember-canyon`, and `midnight-harbor`. `RaceResult` carries variant, rules version, completed race duration, best lap, and casual points. The browser stores per-track personal race/lap times under `oa-racing-v2`; original oval points remain untouched in generic arcade history and are never imported as new track times. Recovery adds two seconds. The future service contracts accept `variantId`, and migration 002 adds variant keys and time indexes. Any cross-device time board must filter by track, rules version, season and verified state, and order duration ascending with stable ties. The migrations remain unapplied scaffolding; live records remain local and unverified.
