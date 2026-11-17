@@ -9,6 +9,7 @@ import {
   advanceCheckpoint,
   CHECKPOINTS,
   steerHeading,
+  stepBoost,
   saveRaceResult,
   parseRaceRecords,
 } from "./racing";
@@ -136,4 +137,18 @@ test("driving each complete course through projected points yields exactly three
     }
     assert.equal(state.laps, 3, track.name);
   }
+});
+
+test("boost must be released to recharge and never produces negative energy", () => {
+  assert.deepEqual(stepBoost(0, true, true, 0.1), { active: false, energy: 0 });
+  assert.deepEqual(stepBoost(0, false, true, 1), { active: false, energy: 12 });
+  assert.deepEqual(stepBoost(1, true, true, 1), { active: true, energy: 0 });
+  assert.deepEqual(stepBoost(90, false, true, 2), {
+    active: false,
+    energy: 100,
+  });
+  assert.deepEqual(stepBoost(10, true, false, 1), {
+    active: false,
+    energy: 10,
+  });
 });

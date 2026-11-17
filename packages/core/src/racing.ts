@@ -290,3 +290,18 @@ export function saveRaceResult(
     },
   };
 }
+export function stepBoost(
+  energy: number,
+  pressed: boolean,
+  canBoost: boolean,
+  dt: number,
+) {
+  const active = pressed && canBoost && energy > 0;
+  return {
+    active,
+    energy: Math.max(
+      0,
+      Math.min(100, energy + (active ? -32 : pressed ? 0 : 12) * dt),
+    ),
+  };
+}

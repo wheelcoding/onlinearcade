@@ -8,6 +8,7 @@ import {
   projectToTrack,
   advanceCheckpoint,
   steerHeading,
+  stepBoost,
   CHECKPOINTS,
   type TrackId,
   type RaceResult,
@@ -297,6 +298,7 @@ export default function KartCircuit({
           )
         )
           event.preventDefault();
+        if (event.code === "Space" && event.repeat) return;
         key(event.code, true);
       },
       keyUp = (event: KeyboardEvent) => key(event.code, false),
@@ -340,15 +342,14 @@ export default function KartCircuit({
           const throttle = keys.has("KeyW") || keys.has("ArrowUp"),
             brake = keys.has("KeyS") || keys.has("ArrowDown"),
             off = roadBefore.distance > track.width / 2;
-          boosting =
-            (keys.has("ShiftLeft") || keys.has("ShiftRight")) &&
-            boost > 0 &&
-            throttle &&
-            !off;
-          boost = Math.max(
-            0,
-            Math.min(100, boost + (boosting ? -32 : 12) * dt),
+          const boostState = stepBoost(
+            boost,
+            keys.has("ShiftLeft") || keys.has("ShiftRight"),
+            throttle && !off,
+            dt,
           );
+          boosting = boostState.active;
+          boost = boostState.energy;
           const pad =
             !off &&
             [0.18, 0.6].some((p) => Math.abs(roadBefore.progress - p) < 0.013);
