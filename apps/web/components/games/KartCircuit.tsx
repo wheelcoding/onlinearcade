@@ -336,7 +336,8 @@ export default function KartCircuit({
             const steering =
               Number(keys.has("ArrowRight") || keys.has("KeyD")) -
               Number(keys.has("ArrowLeft") || keys.has("KeyA"));
-            heading +=
+            // The follow camera looks along +Z: screen-right is a negative Y rotation.
+            heading -=
               steering *
               1.55 *
               dt *
