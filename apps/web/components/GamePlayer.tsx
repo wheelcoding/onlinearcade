@@ -7,10 +7,19 @@ import { gameById } from "../lib/catalog";
 const PhaserArcade = dynamic(() => import("./games/PhaserArcade"), {
   ssr: false,
 });
-const KartCircuit = dynamic(() => import("./games/KartCircuit"), {
-  ssr: false,
-});
-export default function GamePlayer({
+const RacingPlayer = dynamic(() => import("./RacingPlayer"), { ssr: false });
+export default function GamePlayer(props: {
+  gameId: GameId;
+  onClose: () => void;
+  onScore: (score: number) => void;
+}) {
+  return props.gameId === "sunset-circuit" ? (
+    <RacingPlayer onClose={props.onClose} onScore={props.onScore} />
+  ) : (
+    <ArcadePlayer {...props} />
+  );
+}
+function ArcadePlayer({
   gameId,
   onClose,
   onScore,
@@ -70,7 +79,7 @@ export default function GamePlayer({
       before?.focus();
     };
   }, []);
-  const Engine = gameId === "sunset-circuit" ? KartCircuit : PhaserArcade;
+  const Engine = PhaserArcade;
   function togglePause() {
     control.current?.pause(!paused);
     setPaused(!paused);

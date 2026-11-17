@@ -30,12 +30,12 @@ export const games: GameDefinition[] = [
     category: "Racing",
     type: "3D · TIME TRIAL",
     art: "racing",
-    tag: "NEW · 3D",
-    desc: "Chase the golden hour. Own every corner.",
+    tag: "4 TRACKS · 3D",
+    desc: "Four worlds. New elevations. Own every corner.",
     playable: true,
     controls: "↑ / W accelerate · ↓ / S brake · ← → / A D steer",
     objective:
-      "Follow the oval track for 3 laps. Stay on the asphalt to keep your speed. Faster finishes score higher.",
+      "Choose one of four courses and complete three laps through every gate. Brake for the corners and use Shift to boost.",
   },
   {
     id: "starfall",

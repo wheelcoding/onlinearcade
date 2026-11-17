@@ -245,7 +245,7 @@ export default function Home() {
             <div className="featured-bottom">
               <span className="eyebrow">TAKE THE SCENIC ROUTE</span>
               <h2>Sunset Circuit</h2>
-              <p>Golden skies. Tight corners. Your fastest lap.</p>
+              <p>Four detailed worlds. One perfect racing line.</p>
               <span className="featured-play">
                 Jump in <ArrowUpRight size={18} />
               </span>
