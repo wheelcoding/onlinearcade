@@ -42,3 +42,23 @@ Server validates actions, names, codes, capacity and host permissions. Each sock
 Set `NEXT_PUBLIC_MULTIPLAYER_URL` **before building** the web app to your public HTTPS Socket.IO server URL. Set server `WEB_ORIGIN` to the exact frontend origin (comma separated if multiple), and optionally `PORT` (default 3001). See `.env.example`. Without a reachable server the frontend displays an offline state and local Neon Dash remains playable. Sites static hosting cannot run this persistent Node server; deploy it separately.
 
 Future games are explicitly marked in development and have no launch controls. Shooter and puzzle categories show honest empty states. Leaderboards show browser-local runs, high score and total score; verified wins are deferred.
+
+## GitHub Pages
+
+The `Deploy GitHub Pages` workflow publishes the static frontend at
+https://wheelcoding.github.io/onlinearcade/ using the `/onlinearcade` Next.js base path.
+It deploys pushes to `main` and the initial `feat/onlinearcade-foundation` branch,
+so the open foundation PR can be previewed without merging it. After merging,
+remove the development branch from the workflow's push triggers.
+
+Pages repository settings must use **GitHub Actions** as the build source.
+Optionally set the repository Actions variable `NEXT_PUBLIC_MULTIPLAYER_URL`
+to your separately hosted HTTPS Socket.IO server before deploying; set that
+server's `WEB_ORIGIN=https://wheelcoding.github.io`. Without this variable,
+Pages serves the complete solo game and displays multiplayer as offline.
+
+To build the Pages version locally:
+
+```sh
+NEXT_PUBLIC_BASE_PATH=/onlinearcade npm run build
+```
