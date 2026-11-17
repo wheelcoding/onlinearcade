@@ -1,0 +1,18 @@
+{
+  "name": "onlinearcade",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n web,server \"npm run dev -w @onlinearcade/web\" \"npm run dev -w @onlinearcade/server\"",
+    "build": "npm run build --workspaces --if-present && node scripts/copy-static.mjs",
+    "check": "npm run check --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3"
+  }
+}
