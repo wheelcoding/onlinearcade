@@ -1,4 +1,5 @@
 import * as T from "three";
+import { createRaceAtmosphere } from "./race-atmosphere";
 import {
   projectToTrack,
   trackPose,
@@ -121,6 +122,7 @@ export function createRaceView(
     quality === "high" ? 2048 : 1024,
   );
   world.gate.visible = false;
+  const atmosphere = createRaceAtmosphere(scene, sim.track.biome);
   const camera = new T.PerspectiveCamera(66, 16 / 9, 0.1, 650),
     desired = new T.Vector3(),
     look = new T.Vector3(),
@@ -387,10 +389,12 @@ export function createRaceView(
         camera.fov += (targetFov - camera.fov) * (1 - Math.exp(-dt * 4));
         camera.updateProjectionMatrix();
       }
+      atmosphere.update(state.time, player.x, road.y, player.z);
       world.update(state.time);
       renderer.render(scene, camera);
     },
     dispose: () => {
+      atmosphere.dispose();
       sparkGeometry.dispose();
       sparkMaterial.dispose();
       skidGeometry.dispose();

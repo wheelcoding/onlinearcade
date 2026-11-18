@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   TRACKS,
+  MEDAL_TIMES,
   getTrack,
   sampleTrack,
   trackLength,
@@ -399,6 +400,23 @@ export default function RacingPlayer({
                 </button>
               </div>
             </div>
+            {mode === "time-trial" && (
+              <div className="medal-targets">
+                <span>THREE-LAP MEDAL TARGETS</span>
+                {[
+                  ["Gold", 1],
+                  ["Silver", 1.15],
+                  ["Bronze", 1.35],
+                ].map(([label, factor]) => (
+                  <b key={label}>
+                    {label}{" "}
+                    <em>
+                      {formatRaceTime(MEDAL_TIMES[selected] * Number(factor))}
+                    </em>
+                  </b>
+                ))}
+              </div>
+            )}
             <div className="driving-primer">
               <span>
                 <b>01 · BRAKE</b>Slow before a tight corner.
@@ -598,6 +616,15 @@ export default function RacingPlayer({
                         </span>
                       </div>
                       <div className="tour-result">
+                        <p className="race-coach">
+                          {result.collisions > 3
+                            ? "Next run: brake earlier and leave room on corner exits."
+                            : result.drifts === 0
+                              ? "Next run: try holding a drift through a long corner, then release for turbo."
+                              : result.recoveries > 0
+                                ? "Next run: stay on track and avoid the two-second recovery penalty."
+                                : "Clean work. Try the next AI pace or chase a faster ghost."}
+                        </p>
                         <div className="podium-stars">
                           {"★".repeat(result.medal)}
                           {"☆".repeat(3 - result.medal)}
