@@ -26,6 +26,8 @@ jobs:
       - run: npm run build
         env:
           NEXT_PUBLIC_BASE_PATH: /onlinearcade
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_MULTIPLAYER_URL: ${{ vars.NEXT_PUBLIC_MULTIPLAYER_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
