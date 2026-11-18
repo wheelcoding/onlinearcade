@@ -97,7 +97,7 @@ export default function PhaserArcade({
                   this.jumpPulse = 0.09;
                 if (
                   gameId === "neon-dash"
-                    ? ["ShiftLeft", "KeyX"].includes(key)
+                    ? ["ShiftLeft", "ShiftRight", "KeyX"].includes(key)
                     : key === "Space"
                 )
                   this.actionPulse = 0.09;
@@ -235,7 +235,9 @@ export default function PhaserArcade({
                 action:
                   this.actionPulse > 0 ||
                   (gameId === "neon-dash"
-                    ? this.keys.has("ShiftLeft") || this.keys.has("KeyX")
+                    ? this.keys.has("ShiftLeft") ||
+                      this.keys.has("ShiftRight") ||
+                      this.keys.has("KeyX")
                     : this.keys.has("Space")),
                 tap: this.tap,
                 pointer:
