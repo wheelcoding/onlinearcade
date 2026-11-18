@@ -67,8 +67,8 @@ export class ArcadeSimulation {
   ended = false;
   won = false;
   events: ArcadeEvent[] = [];
-  message = "GET READY";
-  messageTime = 2;
+  message = "GO!";
+  messageTime = 0.8;
   player = { x: 155, y: 419, vx: 0, vy: 0 };
   invulnerable = 0;
   energy = 100;
