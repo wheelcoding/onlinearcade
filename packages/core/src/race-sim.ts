@@ -158,8 +158,7 @@ export class RaceSimulation {
     this.cars = Array.from(
       { length: mode === "grand-prix" ? 5 : 1 },
       (_, id) => {
-        const grid =
-            mode === "grand-prix" ? (id === 0 ? -0.022 : (4 - id) * -0.012) : 0,
+        const grid = mode === "grand-prix" ? (4 - id) * -0.012 : 0,
           lane = mode === "grand-prix" ? (id % 2 === 0 ? -1 : 1) * 1.7 : 0,
           p = trackPose(this.samples, grid);
         return {

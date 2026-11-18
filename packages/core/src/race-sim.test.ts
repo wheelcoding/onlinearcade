@@ -144,3 +144,13 @@ test("ghost interpolation wraps headings along shortest arc and compares equal p
   assert.equal(ghostDelta(frames, 2, 12), null);
   assert.equal(ghostPose([], 2), null);
 });
+
+test("starting grid keeps all karts separated with the player in fifth", () => {
+  for (const track of TRACKS) {
+    const s = new RaceSimulation(track.id);
+    assert.equal(s.position, 5);
+    for (const a of s.cars)
+      for (const b of s.cars)
+        if (a.id !== b.id) assert.ok(Math.hypot(a.x - b.x, a.z - b.z) > 2.25);
+  }
+});
