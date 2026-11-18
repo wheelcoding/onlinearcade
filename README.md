@@ -36,7 +36,7 @@ Real server-connected presence, private six-character room codes, up to eight me
 
 The server validates membership, names, codes, capacity, ready checks, host permissions and chat (1–300 characters, bounded to the latest 50 messages). Each socket has a token bucket (15 burst, 1 action/second refill), a separate chat limiter (5 burst, 1 message per 1.5 seconds), a 4 KB message limit, and connection limits. Resume credentials never appear in room snapshots or chat; leave/kick invalidates them. Rooms/chat are memory-only and reset on server restarts. This does not simulate shared movement or verify competitive scores.
 
-To activate the public service, follow **[multiplayer deployment](docs/multiplayer-deployment.md)**. The included Render blueprint provides a free deployment; it requires a Render account and the actual public service URL in `apps/web/config/multiplayer.json` or GitHub’s `NEXT_PUBLIC_MULTIPLAYER_URL` variable, followed by a Pages rebuild. Free instances can sleep; automatic reconnect handles cold starts. Without activation the website explicitly says setup is needed and does not display a fabricated online state.
+The public service is configured at `https://onlinearcade-multiplayer.onrender.com` through `apps/web/config/multiplayer.json`. See **[multiplayer deployment](docs/multiplayer-deployment.md)** to maintain or replace it. GitHub’s `NEXT_PUBLIC_MULTIPLAYER_URL` variable can override this address and requires a Pages rebuild. Free instances can sleep; automatic reconnect handles cold starts. The website only displays real server connection counts.
 
 ## Production
 
