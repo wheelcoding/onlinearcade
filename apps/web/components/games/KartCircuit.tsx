@@ -60,7 +60,7 @@ type Props = EngineProps & {
   paint: string;
   onTourFinish: (outcome: TourResult, replay: Replay | null) => void;
   onRaceHud: (hud: RaceHud) => void;
-  onPauseRequest: () => void;
+  onPauseRequest: (toggle?: boolean) => void;
   quality: "balanced" | "high";
   ghostReplay: Replay | null;
   racingLine: boolean;
@@ -217,7 +217,7 @@ export default function KartCircuit({
     };
     const key = (code: string, down: boolean) => {
       if (down && code === "KeyP") {
-        callbacks.current.onPauseRequest();
+        callbacks.current.onPauseRequest(true);
         return;
       }
       if (down && (paused || sim.finished)) return;
@@ -263,11 +263,7 @@ export default function KartCircuit({
       if (disposed) return;
       let dt = (now - last) / 1000;
       last = now;
-      if (dt > 0.5 && !paused && !sim.finished) {
-        callbacks.current.onPauseRequest();
-        paused = true;
-        keys.clear();
-      }
+      // Visibility/blur pause explicitly; a rendering hitch only drops excess time.
       dt = Math.min(dt, 0.25);
       if (!paused && !sim.finished) {
         sim.advance(dt, {

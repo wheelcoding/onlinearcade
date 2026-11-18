@@ -443,10 +443,11 @@ export default function RacingPlayer({
                 ghostReplay={career.ghosts[selected] || null}
                 racingLine={line}
                 audio={audio.current}
-                onPauseRequest={() => {
+                onPauseRequest={(toggle = false) => {
                   setPaused((prev) => {
-                    control.current?.pause(!prev);
-                    return !prev;
+                    const next = toggle ? !prev : true;
+                    control.current?.pause(next);
+                    return next;
                   });
                 }}
                 onTourFinish={finish}
