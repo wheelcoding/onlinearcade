@@ -58,6 +58,39 @@ export type Crystal = {
   maxHp: number;
   color: number;
 };
+export type RunnerObstacle = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  kind: "spike" | "drone" | "double";
+  passed: boolean;
+};
+export const runnerSpikeOffsets = (kind: RunnerObstacle["kind"]) =>
+  kind === "double" ? [0, 42] : [0];
+/** Inset player box against the visible triangle, rather than the triangle's empty bounding-box corners. */
+export function runnerHitsObstacle(x: number, y: number, o: RunnerObstacle) {
+  const left = x - 12,
+    right = x + 12,
+    top = y - 18,
+    bottom = y + 18;
+  if (o.kind === "drone")
+    return (
+      right > o.x + 4 &&
+      left < o.x + o.width - 4 &&
+      bottom > o.y + 4 &&
+      top < o.y + o.height - 4
+    );
+  return runnerSpikeOffsets(o.kind).some((offset) => {
+    const tip = o.y + 3,
+      base = o.y + o.height - 2;
+    if (bottom <= tip || top >= base) return false;
+    const center = o.x + offset + 20,
+      half = ((Math.min(bottom, base) - o.y) / o.height) * 20 - 2,
+      near = Math.max(left - center, center - right, 0);
+    return near < half;
+  });
+}
 export class ArcadeSimulation {
   kind: ArcadeKind;
   time = 0;
@@ -126,6 +159,8 @@ export class ArcadeSimulation {
   previousBoard: number[] = [];
   private rng: number;
   private accumulator = 0;
+  private pendingJumps = 0;
+  private jumpRequestTime = 0;
   private lastJump = false;
   private lastAction = false;
   private coyote = 0.08;
@@ -201,6 +236,8 @@ export class ArcadeSimulation {
   step(input: ArcadeInput) {
     if (this.ended) return;
     const dt = 1 / 120;
+    this.jumpRequestTime = Math.max(0, this.jumpRequestTime - dt);
+    if (this.jumpRequestTime === 0) this.pendingJumps = 0;
     if (this.countdown > 0) {
       this.countdown = Math.max(0, this.countdown - dt);
       return;
@@ -219,6 +256,18 @@ export class ArcadeSimulation {
     }
     this.lastJump = input.jump;
     this.lastAction = input.action;
+  }
+  queueJump() {
+    if (this.kind !== "neon-dash" || this.ended) return;
+    this.pendingJumps = Math.min(2, this.pendingJumps + 1);
+    this.jumpRequestTime = 0.14;
+  }
+  clearInput() {
+    this.pendingJumps = 0;
+    this.jumpRequestTime = 0;
+    this.buffer = 0;
+    this.lastJump = false;
+    this.lastAction = false;
   }
   finish(won = false) {
     if (this.ended) return;
@@ -242,18 +291,20 @@ export class ArcadeSimulation {
     const target = Math.max(-1, Math.min(1, input.x)) * 280;
     p.vx += (target - p.vx) * (1 - Math.exp(-dt * 16));
     p.x = Math.max(45, Math.min(790, p.x + p.vx * dt));
-    if (input.jump && !this.lastJump) this.buffer = 0.12;
+    if (this.pendingJumps > 0) {
+      this.pendingJumps--;
+      this.buffer = 0.12;
+    } else if (input.jump && !this.lastJump) this.buffer = 0.12;
     this.buffer = Math.max(0, this.buffer - dt);
     this.coyote = this.grounded ? 0.08 : Math.max(0, this.coyote - dt);
     if (this.buffer > 0 && (this.coyote > 0 || this.jumps < 2)) {
       this.jumps = this.coyote > 0 ? 1 : this.jumps + 1;
-      p.vy = this.jumps === 1 ? -610 : -510;
+      p.vy = this.jumps === 1 ? -610 : Math.min(p.vy, -510);
       this.grounded = false;
       this.coyote = 0;
       this.buffer = 0;
       this.emit("jump", p.x, p.y, 0x9df6dc);
     }
-    if (!input.jump && this.lastJump && p.vy < -380) p.vy = -380;
     this.dashCooldown = Math.max(0, this.dashCooldown - dt);
     this.dash = Math.max(0, this.dash - dt);
     this.energy = Math.min(100, this.energy + dt * 12);
@@ -317,10 +368,7 @@ export class ArcadeSimulation {
       if (
         this.dash <= 0 &&
         this.invulnerable <= 0 &&
-        p.x + 13 > o.x + 5 &&
-        p.x - 13 < o.x + o.width - 5 &&
-        p.y + 19 > o.y + 5 &&
-        p.y - 19 < o.y + o.height - 4
+        runnerHitsObstacle(p.x, p.y, o)
       ) {
         o.passed = true;
         this.damage(p.x, p.y);

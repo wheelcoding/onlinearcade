@@ -1,6 +1,8 @@
 import type Phaser from "phaser";
-import type { ArcadeSimulation } from "@onlinearcade/core";
+import { runnerSpikeOffsets, type ArcadeSimulation } from "@onlinearcade/core";
+import { createNeonCity } from "./neon-city";
 export function createArcadeArt(scene: Phaser.Scene, kind: string) {
+  const city = kind === "neon-dash" ? createNeonCity(scene) : null;
   const g = scene.add.graphics(),
     fx = scene.add.graphics();
   const labels = Array.from({ length: 40 }, () =>
@@ -143,7 +145,8 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
             ? 0x112733
             : 0x0d172b,
       );
-      g.fillRect(0, 0, w, h);
+      if (!city) g.fillRect(0, 0, w, h);
+      city?.update(t);
       if (kind !== "tile-shift")
         for (let i = 0; i < 90; i++) {
           const z = 0.3 + (i % 5) * 0.25,
@@ -162,46 +165,9 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
             half = Math.sqrt(Math.max(0, 82 ** 2 - (y - 140) ** 2));
           rect(760 - half, y, half * 2, 9, i < 4 ? 0xf0b2ac : 0xad87ca, 1, 0.8);
         }
-        for (let layer = 0; layer < 3; layer++)
-          for (let i = 0; i < 20; i++) {
-            const span = layer === 0 ? 110 : 90,
-              x =
-                ((((i * span - t * (12 + layer * 22)) % (span * 20)) +
-                  span * 20) %
-                  (span * 20)) -
-                120,
-              height = 70 + ((i * 59 + layer * 37) % 170),
-              y = 440 - height;
-            rect(
-              x,
-              y,
-              span - 14,
-              height,
-              [0x1e2842, 0x272b48, 0x303450][layer],
-              1,
-            );
-            g.lineStyle(1, [0x3d4d6b, 0x647b9a, 0x81799e][layer], 0.3);
-            g.strokeRect(x, y, span - 14, height);
-            for (let r = 0; r < height / 20 - 1; r++)
-              for (let c = 0; c < 3; c++)
-                rect(
-                  x + 9 + c * 20,
-                  y + 14 + r * 20,
-                  5,
-                  7,
-                  (r + c + i) % 4 ? 0x6cbdb7 : 0xe9b2a1,
-                  1,
-                  (r + c + i) % 3 ? 0.15 : 0.65,
-                );
-            if (layer === 2 && i % 3 === 0) {
-              rect(x + 10, y + 25, 48, 24, 0x9d85d1, 3, 0.6);
-              g.lineStyle(2, 0xebcae3, 0.8);
-              g.lineBetween(x + 16, y + 33, x + 48, y + 33);
-            }
-          }
         rect(0, 440, 960, 100, 0x1b2038, 0);
         for (let i = 0; i < 18; i++) {
-          const x = (i * 70 - t * sim.speed) % 1260;
+          const x = (i * 70 - sim.distance) % 1260;
           g.lineStyle(1, 0x536b97, 0.25);
           g.lineBetween(x, 444, x - 90, 540);
         }
@@ -233,7 +199,7 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
             }
             rect(o.x + 13, o.y + 20, 14, 4, 0x22253c, 2);
           } else {
-            for (let x = 0; x < o.width; x += 40) {
+            for (const x of runnerSpikeOffsets(o.kind)) {
               poly(
                 [o.x + x, o.y + 43, o.x + x + 20, o.y, o.x + x + 40, o.y + 43],
                 0xd77298,
@@ -278,8 +244,12 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
             6,
             0.1 - i * 0.009,
           );
-        if (sim.invulnerable <= 0 || Math.floor(t * 12) % 2 === 0) {
-          const stretch = p.vy < -50 ? 0.92 : 1;
+        {
+          if (sim.invulnerable > 0) {
+            g.lineStyle(2, 0xffd8a6, 0.6);
+            g.strokeEllipse(p.x, p.y, 51, 59);
+          }
+          const stretch = 1;
           glow(p.x, p.y, 30, sim.dash > 0 ? 0xc5a5fc : 0x8be4d1);
           rect(p.x - 17, p.y - 21, 34, 42 * stretch, 0x7fc7bb, 7);
           rect(p.x - 14, p.y - 19, 28, 6, 0xc4ffeb, 3);
@@ -287,8 +257,8 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
           rect(p.x + 6, p.y - 8, 8, 7, 0xb4dbf6, 2);
           rect(p.x - 18, p.y + 6, 34, 7, 0x427d87, 2);
           for (const side of [-1, 1]) {
-            const foot = sim.grounded ? Math.sin(t * 19) * side * 5 : side * 4;
-            rect(p.x + side * 9 - 5, p.y + 17, 11, 6 + foot, 0x7ce2ce, 3);
+            const foot = sim.grounded ? Math.sin(t * 19) * side * 4 : side * 3;
+            rect(p.x + side * 9 - 5 + foot, p.y + 14, 11, 7, 0x7ce2ce, 3);
           }
           if (sim.dash > 0) {
             g.lineStyle(3, 0xccb2ff, 0.8);
@@ -648,7 +618,10 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
           });
         }
         if (ev.kind === "hit" && ev.amount !== 3)
-          scene.cameras.main.shake(90, 0.003);
+          scene.cameras.main.shake(
+            kind === "neon-dash" ? 60 : 90,
+            kind === "neon-dash" ? 0.0008 : 0.003,
+          );
         scene.game.events.emit("arcade:sound", ev.kind);
       }
       for (let i = particles.length - 1; i >= 0; i--) {
@@ -697,6 +670,7 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
       }
     },
     dispose: () => {
+      city?.dispose();
       g.destroy();
       fx.destroy();
       labels.forEach((l) => l.destroy());

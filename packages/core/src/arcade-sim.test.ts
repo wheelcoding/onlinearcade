@@ -6,6 +6,8 @@ import {
   puzzleDistance,
   moveTile,
   isSolved,
+  runnerSpikeOffsets,
+  runnerHitsObstacle,
 } from "./index";
 const ready = (kind: ConstructorParameters<typeof ArcadeSimulation>[0]) => {
   const s = new ArcadeSimulation(kind, 42);
@@ -258,5 +260,86 @@ test("tile undo restores the previous board; hints highlight a legal tile and in
   assert.equal(
     s.totalScore,
     20000 - 3 * 40 - Math.floor(s.time) * 10 - 600 - 120,
+  );
+});
+
+test("runner spike collision follows the drawn triangles, including both double spikes", () => {
+  const spike = {
+    x: 100,
+    y: 397,
+    width: 40,
+    height: 43,
+    kind: "spike" as const,
+    passed: false,
+  };
+  assert.equal(
+    runnerHitsObstacle(95, 392, spike),
+    false,
+    "empty space beside the tip is safe",
+  );
+  assert.equal(
+    runnerHitsObstacle(120, 390, spike),
+    true,
+    "the actual spike tip/body collides",
+  );
+  assert.equal(
+    runnerHitsObstacle(120, 370, spike),
+    false,
+    "a clean jump clears the spike",
+  );
+  const pair = { ...spike, width: 82, kind: "double" as const };
+  assert.deepEqual(runnerSpikeOffsets(pair.kind), [0, 42]);
+  assert.equal(
+    runnerSpikeOffsets(pair.kind).at(-1)! + 40,
+    pair.width,
+    "rendered spikes fit their obstacle bounds",
+  );
+  assert.equal(runnerHitsObstacle(163, 418, pair), true);
+  assert.equal(
+    runnerHitsObstacle(205, 418, pair),
+    false,
+    "no invisible third spike",
+  );
+});
+test("runner tap and held jumps have identical arcs without abrupt release cuts", () => {
+  const tapped = ready("neon-dash"),
+    held = ready("neon-dash");
+  tapped.step({ ...noArcadeInput(), jump: true });
+  held.step({ ...noArcadeInput(), jump: true });
+  for (let i = 0; i < 65; i++) {
+    tapped.step(noArcadeInput());
+    held.step({ ...noArcadeInput(), jump: true });
+    assert.equal(tapped.player.y, held.player.y);
+    assert.equal(tapped.player.vy, held.player.vy);
+  }
+  assert.equal(held.jumps, 1, "holding jump does not repeat it");
+});
+test("two rapid jump gestures survive a frame boundary and pause clears queued gestures", () => {
+  const s = ready("neon-dash");
+  s.queueJump();
+  s.queueJump();
+  s.step({ ...noArcadeInput(), jump: true });
+  assert.equal(s.jumps, 1);
+  s.step(noArcadeInput());
+  assert.equal(s.jumps, 2);
+  assert.ok(
+    s.player.vy < -570,
+    "a quick double tap does not cut upward momentum",
+  );
+  ticks(s, 10);
+  assert.equal(s.jumps, 2);
+  const paused = ready("neon-dash");
+  paused.queueJump();
+  paused.clearInput();
+  paused.step(noArcadeInput());
+  assert.equal(paused.jumps, 0);
+  assert.equal(paused.player.y, 419);
+  const countdown = new ArcadeSimulation("neon-dash", 42);
+  countdown.queueJump();
+  ticks(countdown, 260);
+  assert.equal(
+    countdown.jumps,
+    0,
+    "a stale countdown tap cannot fire much later",
   );
 });
