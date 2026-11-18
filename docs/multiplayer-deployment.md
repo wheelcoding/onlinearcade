@@ -14,9 +14,14 @@ Free Render services sleep when idle. The first connection can take about a minu
 
 ## 2. Connect GitHub Pages
 
+**If you are working with a developer/assistant:** send them only the actual public Render HTTPS URL. They can set `serverUrl` in `apps/web/config/multiplayer.json`, commit it, and let the existing `main` Pages deployment publish it. This file contains a public address, not a secret. No further account credentials are needed.
+
+**If configuring it yourself in the dashboard:**
+
+
 Open [GitHub Actions variables](https://github.com/wheelcoding/onlinearcade/settings/variables/actions).
 
-Create/update **`NEXT_PUBLIC_MULTIPLAYER_URL`** with the server's actual HTTPS URL, without `/socket.io` or `/health`. This URL is public and belongs in a variable, not a secret. Keep the existing Supabase variables.
+Create/update **`NEXT_PUBLIC_MULTIPLAYER_URL`** with the server's actual HTTPS URL, without `/socket.io` or `/health`. This URL is public and belongs in a variable, not a secret. Keep the existing Supabase variables. The Actions variable overrides the repository JSON setting, so remove any outdated value if using the JSON method.
 
 Open [Deploy GitHub Pages](https://github.com/wheelcoding/onlinearcade/actions/workflows/pages.yml), choose **Run workflow** on `main`, and wait for the deployment to complete. The endpoint is compiled into the static website, so this rebuild is necessary.
 
@@ -33,7 +38,7 @@ If someone else is helping with setup, send them just the public Render URL. Do 
 
 ## Troubleshooting
 
-- **Awaiting server activation:** the public frontend build has no valid multiplayer endpoint. Add the variable and redeploy Pages. Production endpoints must use HTTPS and cannot point to localhost.
+- **Awaiting server activation:** the public frontend build has no valid multiplayer endpoint. Set the repository JSON setting or Actions variable and redeploy Pages. Production endpoints must use HTTPS and cannot point to localhost.
 - **Reconnecting / waking up:** check the Render service, logs and `/health`. A free instance may be sleeping. A Retry button is available; do not repeatedly create services.
 - **Health works but the browser cannot connect:** Render `WEB_ORIGIN` must be `https://wheelcoding.github.io` (origin only, no `/onlinearcade` path). If hosting the frontend elsewhere, add its exact origin to the comma-separated list and redeploy the server.
 - **Room disappeared:** the server restarted, the host removed you, or every member left/disconnected beyond the grace period. Create a new room.

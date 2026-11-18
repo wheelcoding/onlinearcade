@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
+import deployment from "../config/multiplayer.json";
 import type {
   PartyState,
   PartyReply,
@@ -78,7 +79,7 @@ export function useParty(onStart: () => void) {
   }, []);
   useEffect(() => {
     const endpoint = multiplayerEndpoint(
-      process.env.NEXT_PUBLIC_MULTIPLAYER_URL,
+      process.env.NEXT_PUBLIC_MULTIPLAYER_URL || deployment.serverUrl,
       location.hostname,
     );
     if (!endpoint) {
