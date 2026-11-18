@@ -13,6 +13,7 @@ import {
 } from "@onlinearcade/core";
 import type { GameControl } from "./games/PhaserArcade";
 import type { RaceHud } from "./games/KartCircuit";
+import { useAccount } from "./account/AccountProvider";
 import TrackMap from "./games/TrackMap";
 import { BrowserRaceRepository, formatRaceTime } from "../lib/race-records";
 const Kart = dynamic(() => import("./games/KartCircuit"), { ssr: false });
@@ -39,10 +40,11 @@ export default function RacingPlayer({
   onClose: () => void;
   onScore: (score: number) => void;
 }) {
+  const cloud = useAccount();
   const [selected, setSelected] = useState<TrackId>("sunset-bay"),
     [racing, setRacing] = useState(false),
     [quality, setQuality] = useState<"balanced" | "high">("balanced"),
-    [records, setRecords] = useState<RaceRecords>({}),
+    [localRecords, setRecords] = useState<RaceRecords>({}),
     [race, setRace] = useState(initialHud),
     [hud, setHud] = useState({
       score: 0,
@@ -59,6 +61,7 @@ export default function RacingPlayer({
     dialog = useRef<HTMLDivElement>(null),
     close = useRef(onClose);
   close.current = onClose;
+  const records = cloud.user ? cloud.raceRecords : localRecords;
   const track = getTrack(selected),
     record = records[selected],
     samples = sampleTrack(track),
@@ -129,6 +132,10 @@ export default function RacingPlayer({
       !records[value.trackId] ||
         value.durationMs < records[value.trackId]!.bestTimeMs,
     );
+    if (cloud.user) {
+      cloud.submitRace(value);
+      return;
+    }
     const next = saveRaceResult(records, value);
     setRecords(next);
     try {
@@ -272,8 +279,9 @@ export default function RacingPlayer({
               </div>
             </div>
             <p className="race-local-note">
-              Track times are saved on this browser. Old oval scores remain in
-              your arcade records; these World Tour times start fresh.
+              {cloud.user
+                ? "New track times sync to your account. Community records are unverified."
+                : "Guest track times stay on this browser. Sign in from My profile to save new races across devices."}
             </p>
           </div>
         ) : (

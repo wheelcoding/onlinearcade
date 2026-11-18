@@ -70,10 +70,14 @@ Every game includes keyboard/touch controls and restart. New games share pause, 
 
 Scores are per game; old Neon Dash records migrate to the versioned format automatically. Only completed runs are recorded. New engines pause when the page is hidden. 3D racing requires WebGL and shows an error if unavailable. Time trial uses sequential track checkpoints; this is casual local scoring, not a server anti-cheat system.
 
-`packages/core` contains game IDs, progress validation, tested puzzle/collision logic and future account/leaderboard service contracts. Read [account architecture](docs/accounts-and-leaderboards.md) for the identity, authenticated API, database, guest-import and score-verification extension plan. Cross-device sync and sign-in are not enabled yet.
+`packages/core` contains game IDs, progress validation, tested puzzle/collision logic and future account/leaderboard service contracts. Read [account architecture](docs/accounts-and-leaderboards.md) for the identity, authenticated API, database, guest-import and score-verification extension plan. Supabase sign-in and cloud sync are available after the dashboard activation described below.
 
 ## Sunset Circuit World Tour
 
 The racer now includes four distinct courses: Sunset Bay (coast), Alpine Pass (elevated mountain bends), Ember Canyon (red-rock desert), and Midnight Harbor (neon city/docks). Choose a track and graphics quality in the garage. Complete three laps through all 24 checkpoint sectors in order; reverse driving, skipped gates and off-road gates do not earn lap credit. Roads use continuous spline layouts, elevation, curbs, guardrails, piers, acceleration strips and original procedural scenery with GPU-instanced props.
 
 W/Up accelerates, S/Down brakes, A/Left and D/Right steer, Shift spends recharging boost, and Space recovers to the last checkpoint with a two-second penalty. Touch buttons provide the same actions. The race UI includes a countdown, live minimap, speed/boost gauges, lap timer and per-track best race/lap times. Fullscreen, pause, restart and track switching are available. New track times are separate from the original oval's arcade points. These are casual local records, not verified online rankings.
+
+## Supabase accounts and cloud records
+
+Email/password sign-up, sign-in, email confirmation, password reset, public display names, cross-device records and per-game/per-track **community (unverified)** boards are implemented. Activate them using [Supabase setup](docs/supabase-setup.md): run the Supabase migration, configure Auth redirects/email delivery, add the two public repository build variables, then run a new Pages deployment. Never use a secret/service-role key in the frontend. The optional backend activation does not affect guest play or require moving the site off GitHub Pages.

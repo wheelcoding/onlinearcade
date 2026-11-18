@@ -11,6 +11,9 @@ import {
 import { games, gameById, playableGames } from "../lib/catalog";
 import { BrowserProgressRepository } from "../lib/progress";
 import GameArtwork from "../components/GameArtwork";
+import { useAccount } from "../components/account/AccountProvider";
+import AccountDialog from "../components/account/AccountDialog";
+import CloudLeaderboard from "../components/account/CloudLeaderboard";
 import { io, Socket } from "socket.io-client";
 import {
   Gamepad2,
@@ -56,11 +59,15 @@ type Party = {
 };
 
 export default function Home() {
+  const cloud = useAccount();
+  const [boardMode, setBoardMode] = useState<"local" | "community">(
+    "community",
+  );
   const [category, setCategory] = useState("All games"),
     [query, setQuery] = useState(""),
     [playing, setPlaying] = useState<GameId | null>(null),
     [profile, setProfile] = useState(false),
-    [name, setName] = useState("Player"),
+    [guestName, setGuestName] = useState("Player"),
     [progress, setProgress] = useState<LocalProgress>(emptyProgress),
     [boardGame, setBoardGame] = useState<GameId>("neon-dash"),
     [storageNotice, setStorageNotice] = useState(""),
@@ -76,7 +83,7 @@ export default function Home() {
   useEffect(() => {
     try {
       setProgress(new BrowserProgressRepository(localStorage).load());
-      setName(localStorage.getItem("oa-name") || "Player");
+      setGuestName(localStorage.getItem("oa-name") || "Player");
     } catch {}
     const endpoint =
       process.env.NEXT_PUBLIC_MULTIPLAYER_URL ||
@@ -122,6 +129,10 @@ export default function Home() {
       s.disconnect();
     };
   }, []);
+  useEffect(() => {
+    if (cloud.recovering) setProfile(true);
+  }, [cloud.recovering]);
+  const name = cloud.account?.displayName || guestName;
   function action(action: string) {
     if (!socket?.connected) {
       setError(
@@ -143,8 +154,14 @@ export default function Home() {
         },
       );
   }
-  const records = progress.games[boardGame] || emptyStats();
+  const records =
+    (cloud.user ? cloud.progress : progress).games[boardGame] || emptyStats();
   function saveScore(gameId: GameId, score: number) {
+    if (cloud.user) {
+      setBoardGame(gameId);
+      if (gameId !== "sunset-circuit") cloud.submitGame(gameId, score);
+      return;
+    }
     // Persist outside React state updaters: Strict Mode may invoke updaters twice.
     let next: LocalProgress;
     try {
@@ -187,7 +204,13 @@ export default function Home() {
         </nav>
         <button className="profile" onClick={() => setProfile(true)}>
           <span className="avatar">{name.slice(0, 1).toUpperCase()}</span>
-          <span>My profile</span>
+          <span>
+            {cloud.user
+              ? "My account"
+              : cloud.configured
+                ? "Sign in / Profile"
+                : "My profile"}
+          </span>
           <ChevronRight size={15} />
         </button>
       </header>
@@ -437,7 +460,8 @@ export default function Home() {
                   <input
                     maxLength={20}
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    disabled={!!cloud.user}
                     placeholder="Your name"
                   />
                 </label>
@@ -484,9 +508,54 @@ export default function Home() {
               </h2>
             </div>
             <span className="local-badge">
-              <Trophy size={15} /> Local records
+              <Trophy size={15} />{" "}
+              {boardMode === "community" && cloud.configured
+                ? "Community · unverified"
+                : cloud.user
+                  ? "My cloud records"
+                  : "Local records"}
             </span>
           </div>
+          <div className="board-modes">
+            <button
+              aria-pressed={boardMode === "community"}
+              disabled={!cloud.configured}
+              title={
+                !cloud.configured
+                  ? "Community boards are being configured"
+                  : undefined
+              }
+              onClick={() => setBoardMode("community")}
+            >
+              Community leaderboard
+            </button>
+            <button
+              aria-pressed={boardMode === "local"}
+              onClick={() => setBoardMode("local")}
+            >
+              {cloud.user ? "My cloud records" : "This browser"}
+            </button>
+            {!cloud.user && (
+              <button
+                className="account-callout"
+                onClick={() => setProfile(true)}
+              >
+                Sign in to save across devices →
+              </button>
+            )}
+          </div>
+          {cloud.user && (
+            <div className="sync-notice" role="status">
+              {cloud.syncing
+                ? "Saving results…"
+                : cloud.pending
+                  ? `${cloud.pending} run(s) waiting to sync`
+                  : cloud.error || "Signed in · New runs save across devices"}
+              {(cloud.pending > 0 || cloud.error) && (
+                <button onClick={cloud.retry}>Retry sync</button>
+              )}
+            </div>
+          )}
           <div className="board-filters" aria-label="Leaderboard game">
             {playableGames.map((g) => (
               <button
@@ -504,50 +573,59 @@ export default function Home() {
               {storageNotice}
             </p>
           )}
-          <div className="record-layout">
-            <div className="ranking">
-              <div className="ranking-head">
-                <span>PLAYER</span>
-                <span>RUNS</span>
-                <span>HIGH SCORE</span>
-              </div>
-              {records.runs ? (
-                <div className="ranking-row">
-                  <span>
-                    <b>01</b>
-                    <span className="avatar">{name[0]}</span>
-                    {name}
-                  </span>
-                  <span>{records.runs}</span>
-                  <strong>{records.best.toLocaleString()}</strong>
+          {boardMode === "community" && cloud.configured ? (
+            <CloudLeaderboard
+              gameId={boardGame}
+              onSignIn={() => setProfile(true)}
+            />
+          ) : (
+            <div className="record-layout">
+              <div className="ranking">
+                <div className="ranking-head">
+                  <span>PLAYER</span>
+                  <span>RUNS</span>
+                  <span>HIGH SCORE</span>
                 </div>
-              ) : (
-                <div className="records-empty">
-                  <Trophy size={24} />
-                  <div>
-                    No records. Yet.
-                    <small>
-                      Finish a {gameById(boardGame).title} run to set your first
-                      record.
-                    </small>
+                {records.runs ? (
+                  <div className="ranking-row">
+                    <span>
+                      <b>01</b>
+                      <span className="avatar">{name[0]}</span>
+                      {name}
+                    </span>
+                    <span>{records.runs}</span>
+                    <strong>{records.best.toLocaleString()}</strong>
                   </div>
-                  <button onClick={() => setPlaying(boardGame)}>
-                    Let’s play <ArrowUpRight size={16} />
-                  </button>
-                </div>
-              )}
-              <p>
-                {gameById(boardGame).title} · Records are saved on this browser.
-                Account sync and verified global rankings are planned.
-              </p>
+                ) : (
+                  <div className="records-empty">
+                    <Trophy size={24} />
+                    <div>
+                      No records. Yet.
+                      <small>
+                        Finish a {gameById(boardGame).title} run to set your
+                        first record.
+                      </small>
+                    </div>
+                    <button onClick={() => setPlaying(boardGame)}>
+                      Let’s play <ArrowUpRight size={16} />
+                    </button>
+                  </div>
+                )}
+                <p>
+                  {gameById(boardGame).title} ·{" "}
+                  {cloud.user
+                    ? "Your account records, available across devices."
+                    : "Guest records are saved on this browser. Sign in to save new runs across devices."}
+                </p>
+              </div>
+              <div className="stat-box">
+                <Zap size={23} />
+                <span>TOTAL SCORE · THIS GAME</span>
+                <strong>{records.total.toLocaleString()}</strong>
+                <small>Every run counts.</small>
+              </div>
             </div>
-            <div className="stat-box">
-              <Zap size={23} />
-              <span>TOTAL SCORE · THIS GAME</span>
-              <strong>{records.total.toLocaleString()}</strong>
-              <small>Every run counts.</small>
-            </div>
-          </div>
+          )}
         </section>
         <footer>
           <a className="brand" href="#home">
@@ -574,51 +652,16 @@ export default function Home() {
         />
       )}
       {profile && (
-        <div
-          className="modal"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Local profile"
-        >
-          <div className="profile-dialog">
-            <button
-              className="close"
-              onClick={() => setProfile(false)}
-              aria-label="Close profile"
-            >
-              ✕
-            </button>
-            <span className="eyebrow">YOUR CORNER OF THE ARCADE</span>
-            <h2>Hey, {name}.</h2>
-            <p>
-              Your profile and game records are stored on this browser. Accounts
-              and cross-device sync are planned.
-            </p>
-            <label className="field-label">
-              Display name
-              <input
-                value={name}
-                maxLength={20}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-            <button
-              className="primary full"
-              onClick={() => {
-                const clean = name.trim();
-                if (!/^[\p{L}\p{N} _-]{1,20}$/u.test(clean)) return;
-                setName(clean);
-                try {
-                  localStorage.setItem("oa-name", clean);
-                } catch {}
-                setProfile(false);
-              }}
-            >
-              Save profile <Check size={17} />
-            </button>
-            <small>Use 1–20 letters, numbers, spaces, _ or -.</small>
-          </div>
-        </div>
+        <AccountDialog
+          guestName={guestName}
+          onClose={() => setProfile(false)}
+          onGuestSave={(value) => {
+            setGuestName(value);
+            try {
+              localStorage.setItem("oa-name", value);
+            } catch {}
+          }}
+        />
       )}
     </>
   );

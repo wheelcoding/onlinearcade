@@ -1,6 +1,6 @@
 # Account and leaderboard extension points
 
-The live GitHub Pages app remains guest-only. All currently displayed results are local, unverified records. Nothing claims to sync between devices today.
+Supabase email/password accounts, cloud records and community leaderboards are now implemented; activate them using [Supabase setup](supabase-setup.md). Guest history stays local. Community results are explicitly unverified. The provider-agnostic design below describes the additional backend work required for replay-verified competitive rankings.
 
 ## Boundaries already implemented
 
