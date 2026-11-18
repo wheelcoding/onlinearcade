@@ -64,11 +64,11 @@ NEXT_PUBLIC_BASE_PATH=/onlinearcade npm run build
 
 ## Expanded arcade
 
-Five playable games now ship: **Neon Dash** (double-jump runner and collectible shards), **Sunset Circuit** (Three.js 3D kart time trial, 3 laps), **Starfall** (auto-fire survival shooter), **Prism Break** (48-crystal brick breaker), and **Tile Shift** (solvable 15-puzzle). Cloudbound and Party Planet remain marked in development.
+Five playable games now ship: **Neon Dash** (double-jump runner and collectible shards), **Sunset Circuit** (Three.js kart Grand Prix and ghost Time Trial, 3 laps), **Starfall** (auto-fire survival shooter), **Prism Break** (48-crystal brick breaker), and **Tile Shift** (solvable 15-puzzle). Cloudbound and Party Planet remain marked in development.
 
 Every game includes keyboard/touch controls and restart. New games share pause, fullscreen, instructions, an end-of-run overlay and cleanup of engine resources. The new game art is original inline SVG; the engines draw procedural graphics. No external assets are required.
 
-Scores are per game; old Neon Dash records migrate to the versioned format automatically. Only completed runs are recorded. New engines pause when the page is hidden. 3D racing requires WebGL and shows an error if unavailable. Time trial uses sequential track checkpoints; this is casual local scoring, not a server anti-cheat system.
+Scores are per game; old Neon Dash records migrate to the versioned format automatically. Only completed runs are recorded. New engines pause when the page is hidden. Racing uses Three.js when WebGL is available and automatically falls back to a Canvas 2D chase view using the same simulation otherwise. Time trial uses sequential track checkpoints; this is casual local scoring, not a server anti-cheat system.
 
 `packages/core` contains game IDs, progress validation, tested puzzle/collision logic and future account/leaderboard service contracts. Read [account architecture](docs/accounts-and-leaderboards.md) for the identity, authenticated API, database, guest-import and score-verification extension plan. Supabase sign-in and cloud sync are available after the dashboard activation described below.
 
@@ -76,7 +76,15 @@ Scores are per game; old Neon Dash records migrate to the versioned format autom
 
 The racer now includes four distinct courses: Sunset Bay (coast), Alpine Pass (elevated mountain bends), Ember Canyon (red-rock desert), and Midnight Harbor (neon city/docks). Choose a track and graphics quality in the garage. Complete three laps through all 24 checkpoint sectors in order; reverse driving, skipped gates and off-road gates do not earn lap credit. Roads use continuous spline layouts, elevation, curbs, guardrails, piers, acceleration strips and original procedural scenery with GPU-instanced props.
 
-W/Up accelerates, S/Down brakes, A/Left and D/Right steer, Shift spends recharging boost, and Space recovers to the last checkpoint with a two-second penalty. Touch buttons provide the same actions. The race UI includes a countdown, live minimap, speed/boost gauges, lap timer and per-track best race/lap times. Fullscreen, pause, restart and track switching are available. New track times are separate from the original oval's arcade points. These are casual local records, not verified online rankings.
+The version 3 handling runs at a fixed 60 Hz independently of rendering. Velocity, tire grip, speed-sensitive steering, braking/reverse, drift slip, slope, shoulder resistance, guardrail deflection and kart collisions are simulated. The chase camera follows momentum; animated front wheels, brake lights, turbo exhaust, skid marks, optional racing-line/braking hints and synthesized engine/gear/drift sounds give feedback without downloaded assets.
+
+- **Grand Prix:** race four explicitly labeled AI drivers with Rookie, Club or Expert pace. They steer, brake and overtake using the same physics; no position teleporting or rubber-banding. Earn podium stars across the four courses to unlock cosmetic paints at 2, 6 and 10 stars.
+- **Time Trial:** three-lap timed runs, medal targets, individual lap splits and a translucent personal-best ghost with a live delta. Only faster clean runs without recovery replace the ghost. Replays are bounded, validated and versioned so old handling recordings cannot load.
+- **Controls:** W/Up gas, S/Down brake (hold after stopping to reverse), A/Left and D/Right steer. Hold Space/Z while cornering to drift; release after 1.1 seconds of actual slip for a mini-turbo, or 2.3 seconds for a super turbo. Shift spends nitro, which recharges when released. R recovers to the latest checkpoint (+2 seconds), P pauses. Touch provides simultaneous steering/gas/brake/drift/boost, with recovery in the toolbar. Pause clears held inputs; backgrounding freezes the clock.
+
+Career stars, paint and ghosts are **browser-local**, isolated by account ID or guest. Signed-in **Time Trial** results still sync through the existing Supabase community-records API (payload rulesVersion 2); Grand Prix never uploads into that board. Existing times remain historical casual/unverified records across handling changes, not a competitive season. No database migration is needed for this update. Cross-device career/ghost storage and verified competitive rankings remain future work.
+
+The regression suite drives every circuit using the real simulation and checks AI completion, steering direction, fixed-step consistency, braking, drift release, collisions, recovery, ghost interpolation and account-isolated career saves.
 
 ## Supabase accounts and cloud records
 

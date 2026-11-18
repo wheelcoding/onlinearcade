@@ -28,10 +28,10 @@ export const games: GameDefinition[] = [
     id: "sunset-circuit",
     title: "Sunset Circuit",
     category: "Racing",
-    type: "3D · TIME TRIAL",
+    type: "3D · GRAND PRIX",
     art: "racing",
     tag: "4 TRACKS · 3D",
-    desc: "Four worlds. New elevations. Own every corner.",
+    desc: "Drift. Boost. Overtake. Four circuits, one podium.",
     playable: true,
     controls: "↑ / W accelerate · ↓ / S brake · ← → / A D steer",
     objective:

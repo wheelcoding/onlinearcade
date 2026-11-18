@@ -3494,3 +3494,380 @@ button:active:not(:disabled) {
 .account-dialog form {
   margin-top: 18px;
 }
+/* World Tour driving, garage and race feedback */
+.tour-setup {
+  margin: 24px 0;
+  display: grid;
+  gap: 18px;
+}
+.mode-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.mode-picker button {
+  text-align: left;
+  border: 1px solid #53616c;
+  background: #1c2b39;
+  padding: 18px;
+  border-radius: 12px;
+  display: grid;
+  gap: 7px;
+  transition: 0.2s;
+}
+.mode-picker button[aria-pressed="true"] {
+  background: #38433d;
+  border-color: #f4b578;
+  box-shadow: inset 0 0 0 1px #f4b578;
+}
+.mode-picker b {
+  font-size: 18px;
+  color: #fff0d2;
+}
+.mode-picker small {
+  font-size: 11px;
+  color: #bdc9c7;
+}
+.tour-setup label {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: #c8d5cb;
+}
+.tour-setup select {
+  padding: 10px;
+  background: #1b2938;
+  border: 1px solid #4c5b66;
+  border-radius: 6px;
+  color: #f7ead2;
+}
+.paint-picker {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.paint-picker > span {
+  font-size: 10px;
+  color: #d8c39a;
+  margin-right: auto;
+  letter-spacing: 1px;
+}
+.paint-picker button {
+  border: 1px solid #4c5b66;
+  border-radius: 8px;
+  padding: 9px 12px;
+  display: grid;
+  grid-template-columns: 16px auto;
+  gap: 3px 8px;
+  font-size: 10px;
+  text-align: left;
+  background: #1b2938;
+}
+.paint-picker button[aria-pressed="true"] {
+  border-color: #e9b17b;
+}
+.paint-picker button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.paint-picker i {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  grid-row: span 2;
+  margin-top: 3px;
+}
+.paint-picker small {
+  font-size: 8px;
+  color: #afbeb9;
+}
+.race-assist {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  font-size: 11px;
+  margin-top: 18px;
+  color: #bccdc2;
+  align-items: center;
+}
+.race-assist input {
+  accent-color: #e9b17b;
+}
+.race-standings {
+  position: absolute;
+  left: 20px;
+  top: 112px;
+  padding: 10px 12px;
+  background: #101d2ab0;
+  border: 1px solid #ffffff26;
+  border-radius: 9px;
+  pointer-events: none;
+  min-width: 160px;
+  text-shadow: 0 1px 4px #000;
+}
+.race-standings > b {
+  font-size: 27px;
+  font-style: italic;
+}
+.race-standings > b small {
+  font-size: 13px;
+  color: #9caeaf;
+}
+.race-standings > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  font: 10px monospace;
+  padding: 4px 0;
+}
+.race-standings .you {
+  border-top: 1px solid #ffffff28;
+  color: #ffdfae;
+}
+.race-feedback {
+  position: absolute;
+  top: 23%;
+  left: 25%;
+  right: 25%;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 900;
+  color: #ffe6a9;
+  text-shadow: 0 2px 9px #000;
+  pointer-events: none;
+}
+.ghost-delta {
+  position: absolute;
+  top: 114px;
+  left: 20px;
+  color: #ffb79e;
+  font: 700 22px monospace;
+  background: #101d2aaa;
+  padding: 10px;
+  border-radius: 8px;
+  pointer-events: none;
+}
+.ghost-delta.ahead {
+  color: #9de4bb;
+}
+.ghost-delta small {
+  display: block;
+  font-size: 8px;
+  margin-top: 4px;
+}
+.race-drift {
+  width: 180px;
+  padding-bottom: 3px;
+  opacity: 0.65;
+}
+.race-drift.active {
+  opacity: 1;
+}
+.race-drift span {
+  font-size: 8px;
+  letter-spacing: 0.6px;
+  display: block;
+  margin-bottom: 8px;
+}
+.race-drift progress {
+  width: 100%;
+  height: 5px;
+  accent-color: #d09ce9;
+}
+.race-drift progress::-webkit-progress-bar {
+  background: #ffffff33;
+}
+.race-drift progress::-webkit-progress-value {
+  background: linear-gradient(90deg, #76d9d1, #ffbb75 48%, #ce92f3);
+}
+.tour-result {
+  text-align: center;
+}
+.podium-stars {
+  color: #f3c577;
+  font-size: 27px;
+  letter-spacing: 5px;
+}
+.tour-result p {
+  font-size: 11px;
+  margin: 5px 0;
+  color: #bfcecb;
+}
+.tour-result > div:not(.podium-stars) {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+.tour-result span {
+  font: 9px monospace;
+}
+.tour-result span b {
+  display: block;
+  font-size: 15px;
+  color: #f6e5c5;
+  margin: 5px 0;
+}
+.race-end {
+  overflow: auto;
+  padding: 25px 12px;
+}
+.race-end > strong {
+  font-size: clamp(24px, 4vw, 48px);
+}
+.race-toolbar > div {
+  flex-wrap: wrap;
+}
+.race-bottom-hud {
+  flex-wrap: wrap;
+}
+.offroad-label {
+  position: absolute;
+  bottom: 65px;
+  right: 0;
+}
+@media (max-width: 650px) {
+  .mode-picker button {
+    padding: 13px;
+  }
+  .mode-picker b {
+    font-size: 15px;
+  }
+  .mode-picker small {
+    font-size: 10px;
+    line-height: 1.5;
+  }
+  .paint-picker > span {
+    width: 100%;
+    margin-bottom: 4px;
+  }
+  .paint-picker button {
+    flex: 1;
+    padding: 8px;
+  }
+  .paint-picker {
+    gap: 6px;
+  }
+  .tour-setup select {
+    font-size: 11px;
+    max-width: 72%;
+  }
+  .race-standings {
+    left: 10px;
+    top: 76px;
+    padding: 5px 7px;
+    min-width: 105px;
+  }
+  .race-standings > b {
+    font-size: 19px;
+  }
+  .race-standings > b small {
+    font-size: 9px;
+  }
+  .race-standings > div {
+    font-size: 7px;
+    gap: 10px;
+    padding: 2px 0;
+  }
+  .race-feedback {
+    top: 48%;
+    left: 20%;
+    right: 20%;
+    font-size: 11px;
+  }
+  .ghost-delta {
+    top: 78px;
+    left: 10px;
+    font-size: 15px;
+    padding: 6px;
+  }
+  .ghost-delta small {
+    font-size: 6px;
+  }
+  .race-bottom-hud {
+    gap: 9px;
+    flex-wrap: nowrap;
+  }
+  .race-speed {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .race-boost {
+    min-width: 65px;
+    max-width: 100px;
+    flex: 1;
+  }
+  .race-drift {
+    width: auto;
+    flex: 1;
+    max-width: 150px;
+  }
+  .race-drift span {
+    font-size: 5px;
+    margin-bottom: 5px;
+  }
+  .race-drift progress {
+    height: 3px;
+  }
+  .race-toolbar button {
+    font-size: 8px;
+    padding: 8px;
+  }
+  .tour-result p {
+    font-size: 8px;
+  }
+  .tour-result span {
+    font-size: 7px;
+  }
+  .tour-result span b {
+    font-size: 11px;
+  }
+  .podium-stars {
+    font-size: 21px;
+  }
+  .race-end {
+    justify-content: flex-start;
+    gap: 7px;
+  }
+  .race-end h2 {
+    margin: 0;
+  }
+  .race-end-actions {
+    flex-wrap: wrap;
+  }
+  .offroad-label {
+    bottom: 45px;
+  }
+}
+.driving-primer {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 22px;
+  border-top: 1px solid #ffffff16;
+  padding-top: 18px;
+}
+.driving-primer span {
+  font-size: 10px;
+  line-height: 1.7;
+  color: #b7c7bd;
+}
+.driving-primer b {
+  display: block;
+  color: #e9b17b;
+  letter-spacing: 1.2px;
+  font-size: 9px;
+}
+@media (max-width: 650px) {
+  .driving-primer {
+    gap: 10px;
+  }
+  .driving-primer span {
+    font-size: 8px;
+  }
+  .driving-primer b {
+    font-size: 7px;
+    letter-spacing: 0.5px;
+  }
+}

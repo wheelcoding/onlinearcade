@@ -153,3 +153,4 @@ export function circleHitsBox(
   return (x - nearX) ** 2 + (y - nearY) ** 2 <= r * r;
 }
 export * from "./racing";
+export * from './race-sim';
