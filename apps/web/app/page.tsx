@@ -256,7 +256,7 @@ export default function Home() {
           <button
             className="featured-world"
             onClick={() => setPlaying("sunset-circuit")}
-            aria-label="Play Sunset Circuit 3D time trial"
+            aria-label="Play Sunset Circuit kart racing"
           >
             <GameArtwork game={gameById("sunset-circuit")} />
             <div className="featured-top">
@@ -268,7 +268,7 @@ export default function Home() {
             <div className="featured-bottom">
               <span className="eyebrow">TAKE THE SCENIC ROUTE</span>
               <h2>Sunset Circuit</h2>
-              <p>Four detailed worlds. One perfect racing line.</p>
+              <p>Four circuits. Five drivers. Earn your podium.</p>
               <span className="featured-play">
                 Jump in <ArrowUpRight size={18} />
               </span>

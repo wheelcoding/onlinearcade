@@ -9,10 +9,12 @@ export default function TrackMap({
   track,
   position,
   small = false,
+  rivals = [],
 }: {
   track: TrackDefinition;
   position?: { x: number; z: number };
   small?: boolean;
+  rivals?: { id: number; x: number; z: number; color: string }[];
 }) {
   const samples = sampleTrack(track, 180),
     xs = samples.map((p) => p.x),
@@ -62,6 +64,17 @@ export default function TrackMap({
         stroke="#24334a"
         strokeWidth="2"
       />
+      {rivals.map((c) => (
+        <circle
+          key={c.id}
+          cx={c.x}
+          cy={c.z}
+          r="3.5"
+          fill={c.color}
+          stroke="#222a3c"
+          strokeWidth="1"
+        />
+      ))}
       {position && (
         <>
           <circle
