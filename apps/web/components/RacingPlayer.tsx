@@ -622,7 +622,7 @@ export default function RacingPlayer({
                             : result.drifts === 0
                               ? "Next run: try holding a drift through a long corner, then release for turbo."
                               : result.recoveries > 0
-                                ? "Next run: aim for a clean finish to save your Time Trial ghost."
+                                ? "Next run: stay on track and avoid the two-second recovery penalty."
                                 : "Clean work. Try the next AI pace or chase a faster ghost."}
                         </p>
                         <div className="podium-stars">

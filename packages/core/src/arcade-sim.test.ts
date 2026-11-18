@@ -121,6 +121,18 @@ test("every third shooter wave has a real damageable boss and advances only afte
 test("nova requires full charge and removes enemy shots without granting invincibility forever", () => {
   const s = ready("starfall");
   s.shots.push({ x: 100, y: 300, vx: 0, vy: 100, enemy: true });
+  s.foes.push({
+    id: 1,
+    x: 200,
+    y: 100,
+    vx: 0,
+    vy: 0,
+    hp: 3,
+    maxHp: 3,
+    kind: "gunner",
+    age: 0,
+    fire: 0,
+  });
   s.step({ ...noArcadeInput(), action: true });
   assert.equal(s.energy, 0);
   assert.equal(
@@ -238,6 +250,11 @@ test("tile undo restores the previous board; hints highlight a legal tile and in
   assert.equal(puzzleDistance(s.board), 1);
   s.tile(15);
   assert.ok(s.ended && s.won);
+  assert.equal(
+    s.anim,
+    0,
+    "the completed board renders in its final arrangement",
+  );
   assert.equal(
     s.totalScore,
     20000 - 3 * 40 - Math.floor(s.time) * 10 - 600 - 120,

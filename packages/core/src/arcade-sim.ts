@@ -467,6 +467,7 @@ export class ArcadeSimulation {
       }
     }
     for (const foe of this.foes) {
+      if (foe.hp <= 0) continue;
       foe.age += dt;
       foe.fire -= dt;
       if (foe.kind === "boss") {
@@ -735,6 +736,7 @@ export class ArcadeSimulation {
       65 + Math.floor(index / 4) * 94 + 42,
     );
     if (isSolved(this.board)) {
+      this.anim = 0;
       this.score = Math.max(
         100,
         20000 -
