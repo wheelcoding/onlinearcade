@@ -136,6 +136,20 @@ test("nova requires full charge and removes enemy shots without granting invinci
 });
 test("breaker armored crystals take two hits and sectors use different layouts", () => {
   const s = ready("prism-break");
+  const firstCrystal = s.crystals[0];
+  s.ball = {
+    x: firstCrystal.x + 47,
+    y: firstCrystal.y - 9,
+    vx: 0,
+    vy: 300,
+    active: true,
+  };
+  s.step(noArcadeInput());
+  assert.equal(
+    s.totalScore,
+    50,
+    "the first crystal gives visible score feedback",
+  );
   const first = s.crystals.length;
   s.stage = 2;
   s.makeStage();

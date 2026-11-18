@@ -353,7 +353,7 @@ export class ArcadeSimulation {
         2400,
         Math.max(
           0,
-          Math.floor(
+          Math.ceil(
             (progress * 2100 + Math.min(300, this.bestCombo * 10)) / 50,
           ) * 50,
         ),
