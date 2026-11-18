@@ -48,6 +48,10 @@ export default function PhaserArcade({
           sim!: ArcadeSimulation;
           art!: ReturnType<typeof createArcadeArt>;
           keys = new Set<string>();
+          canvasJumps = new Set<number>();
+          held(key: string) {
+            return this.keys.has(key) || this.keys.has("touch:" + key);
+          }
           paused = false;
           reported = false;
           hudAt = 0;
@@ -60,6 +64,7 @@ export default function PhaserArcade({
           actionPulse = 0;
           create() {
             this.keys.clear();
+            this.canvasJumps.clear();
             this.jumpPulse = 0;
             this.actionPulse = 0;
             this.pointerMode = false;
@@ -75,7 +80,7 @@ export default function PhaserArcade({
               puzzleDifficulty,
             );
             this.art = createArcadeArt(this, gameId);
-            const act = (key: string, down: boolean) => {
+            const act = (key: string, down: boolean, touch = false) => {
               if (down) {
                 audio.unlock();
                 if (["ArrowLeft", "ArrowRight", "KeyA", "KeyD"].includes(key))
@@ -86,15 +91,16 @@ export default function PhaserArcade({
                 return;
               }
               if (this.paused || this.sim.ended) return;
-              const was = this.keys.has(key);
-              if (down) this.keys.add(key);
-              else this.keys.delete(key);
+              const token = touch ? "touch:" + key : key;
+              const was = this.keys.has(token);
+              if (down) this.keys.add(token);
+              else this.keys.delete(token);
               if (down && !was) {
                 if (
                   gameId === "neon-dash" &&
                   ["Space", "ArrowUp"].includes(key)
                 )
-                  this.jumpPulse = 0.09;
+                  this.sim.queueJump();
                 if (
                   gameId === "neon-dash"
                     ? ["ShiftLeft", "ShiftRight", "KeyX"].includes(key)
@@ -157,24 +163,26 @@ export default function PhaserArcade({
                   ? { x: p.x + 156, y: p.y - 67 }
                   : { x: p.x, y: p.y };
               if (gameId === "neon-dash") {
-                this.keys.add("Space");
-                this.jumpPulse = 0.09;
+                this.canvasJumps.add(p.id);
+                this.sim.queueJump();
               }
             });
             this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
               this.pointerMode = true;
               this.pointer = { x: p.x, y: p.y };
             });
-            this.input.on("pointerup", () => {
+            this.input.on("pointerup", (p: Phaser.Input.Pointer) => {
               this.dragging = false;
-              this.keys.delete("Space");
+              this.canvasJumps.delete(p.id);
             });
-            this.input.on("pointerupoutside", () => {
+            this.input.on("pointerupoutside", (p: Phaser.Input.Pointer) => {
               this.dragging = false;
-              this.keys.delete("Space");
+              this.canvasJumps.delete(p.id);
             });
             const blur = () => {
               this.keys.clear();
+              this.canvasJumps.clear();
+              this.sim.clearInput();
               this.jumpPulse = 0;
               this.actionPulse = 0;
               this.dragging = false;
@@ -189,7 +197,7 @@ export default function PhaserArcade({
               this.art.dispose();
             });
             control.current = {
-              key: act,
+              key: (key, down) => act(key, down, true),
               restart: () => {
                 this.seed = Date.now();
                 this.scene.restart();
@@ -197,6 +205,8 @@ export default function PhaserArcade({
               pause: (value) => {
                 this.paused = value;
                 this.keys.clear();
+                this.canvasJumps.clear();
+                this.sim.clearInput();
                 this.jumpPulse = 0;
                 this.actionPulse = 0;
                 this.dragging = false;
@@ -223,22 +233,22 @@ export default function PhaserArcade({
             if (!this.sim.ended) {
               const input = {
                 x:
-                  Number(this.keys.has("ArrowRight") || this.keys.has("KeyD")) -
-                  Number(this.keys.has("ArrowLeft") || this.keys.has("KeyA")),
+                  Number(this.held("ArrowRight") || this.held("KeyD")) -
+                  Number(this.held("ArrowLeft") || this.held("KeyA")),
                 y:
-                  Number(this.keys.has("ArrowDown") || this.keys.has("KeyS")) -
-                  Number(this.keys.has("ArrowUp") || this.keys.has("KeyW")),
+                  Number(this.held("ArrowDown") || this.held("KeyS")) -
+                  Number(this.held("ArrowUp") || this.held("KeyW")),
                 jump:
-                  this.jumpPulse > 0 ||
-                  this.keys.has("Space") ||
-                  this.keys.has("ArrowUp"),
+                  this.canvasJumps.size > 0 ||
+                  this.held("Space") ||
+                  this.held("ArrowUp"),
                 action:
                   this.actionPulse > 0 ||
                   (gameId === "neon-dash"
-                    ? this.keys.has("ShiftLeft") ||
-                      this.keys.has("ShiftRight") ||
-                      this.keys.has("KeyX")
-                    : this.keys.has("Space")),
+                    ? this.held("ShiftLeft") ||
+                      this.held("ShiftRight") ||
+                      this.held("KeyX")
+                    : this.held("Space")),
                 tap: this.tap,
                 pointer:
                   gameId === "prism-break" && this.pointerMode
