@@ -114,19 +114,97 @@ export function createCanvasRace(
         height * 0.63 - b * p.x - d * p.z,
       );
       for (const prop of scenery) {
-        ctx.fillStyle =
-          sim.track.biome === "city"
-            ? "#2c4259"
-            : sim.track.biome === "canyon"
-              ? "#a9664e"
-              : "#426b60";
+        ctx.save();
+        ctx.translate(prop.x, prop.z);
+        const size = prop.size;
+        ctx.fillStyle = "#0d1e3230";
         ctx.beginPath();
-        ctx.arc(prop.x, prop.z, prop.size, 0, Math.PI * 2);
+        ctx.ellipse(
+          size * 0.6,
+          size * 0.8,
+          size * 1.3,
+          size * 0.8,
+          0.6,
+          0,
+          Math.PI * 2,
+        );
         ctx.fill();
         if (sim.track.biome === "city") {
-          ctx.fillStyle = "#97d1c9";
-          ctx.fillRect(prop.x - 1, prop.z - 1, 2, 0.4);
+          ctx.fillStyle = "#293b52";
+          ctx.fillRect(-size, -size, size * 2, size * 2);
+          ctx.fillStyle = "#41576b";
+          ctx.fillRect(
+            -size + 0.4,
+            -size + 0.4,
+            size * 2 - 0.8,
+            size * 2 - 0.8,
+          );
+          ctx.fillStyle = "#9bdbd5";
+          for (let row = 0; row < 3; row++)
+            for (let col = 0; col < 3; col++)
+              ctx.fillRect(
+                -size + 0.7 + col * size * 0.55,
+                -size + 0.8 + row * size * 0.55,
+                0.35,
+                0.5,
+              );
+          ctx.strokeStyle = "#b694df";
+          ctx.lineWidth = 0.15;
+          ctx.strokeRect(-size, -size, size * 2, size * 2);
+        } else if (sim.track.biome === "canyon") {
+          ctx.fillStyle = "#945948";
+          ctx.beginPath();
+          ctx.moveTo(-size, size * 0.7);
+          ctx.lineTo(-size * 0.8, -size * 0.6);
+          ctx.lineTo(size * 0.2, -size);
+          ctx.lineTo(size, size * 0.2);
+          ctx.lineTo(size * 0.6, size);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = "#c68a65";
+          ctx.beginPath();
+          ctx.ellipse(-0.2, -0.6, size * 0.7, size * 0.5, -0.4, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (sim.track.biome === "alpine") {
+          ctx.fillStyle = "#345c56";
+          for (let layer = 0; layer < 3; layer++) {
+            ctx.beginPath();
+            ctx.moveTo(0, -size - layer * 0.7);
+            ctx.lineTo(-size + layer * 0.5, size * 0.5 - layer * 0.8);
+            ctx.lineTo(size - layer * 0.5, size * 0.5 - layer * 0.8);
+            ctx.closePath();
+            ctx.fill();
+          }
+          ctx.fillStyle = "#bdd4cb";
+          ctx.beginPath();
+          ctx.moveTo(0, -size - 1.4);
+          ctx.lineTo(-size * 0.45, -size * 0.1);
+          ctx.lineTo(size * 0.45, -size * 0.1);
+          ctx.closePath();
+          ctx.fill();
+        } else {
+          ctx.strokeStyle = "#a69978";
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(0.6, -1);
+          ctx.stroke();
+          ctx.strokeStyle = "#426e61";
+          ctx.lineWidth = 0.7;
+          for (let leaf = 0; leaf < 6; leaf++) {
+            const angle = (leaf * Math.PI) / 3;
+            ctx.beginPath();
+            ctx.moveTo(0.6, -1);
+            ctx.quadraticCurveTo(
+              Math.sin(angle) * size * 0.6,
+              -1 + Math.cos(angle) * size * 0.6,
+              Math.sin(angle) * size,
+              -1 + Math.cos(angle) * size,
+            );
+            ctx.stroke();
+          }
         }
+        ctx.restore();
       }
       const path = () => {
         ctx.beginPath();
@@ -159,6 +237,24 @@ export function createCanvasRace(
       ctx.setLineDash([2, 4]);
       ctx.stroke();
       ctx.setLineDash([]);
+      for (const at of [0.18, 0.6]) {
+        const strip = trackPose(sim.samples, at);
+        ctx.save();
+        ctx.translate(strip.x, strip.z);
+        ctx.rotate(-Math.atan2(strip.tx, strip.tz));
+        ctx.fillStyle = "#9ce9cc66";
+        ctx.fillRect(-sim.track.width * 0.4, -1.6, sim.track.width * 0.8, 3.2);
+        ctx.strokeStyle = "#d7f1bb";
+        ctx.lineWidth = 0.2;
+        for (const lane of [-1, 0, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(lane * 2 - 0.8, -0.8);
+          ctx.lineTo(lane * 2, 0.5);
+          ctx.lineTo(lane * 2 + 0.8, -0.8);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
       const finish = trackPose(sim.samples, 0);
       ctx.save();
       ctx.translate(finish.x, finish.z);

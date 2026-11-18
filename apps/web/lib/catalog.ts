@@ -18,11 +18,13 @@ export const games: GameDefinition[] = [
     category: "Arcade",
     type: "2D · SOLO",
     art: "neon",
-    tag: "REMASTERED",
-    desc: "A neon city. A perfect jump. An endless chase.",
+    tag: "DELUXE",
+    desc: "Chain the shards. Phase through danger. Own the neon night.",
     playable: true,
-    controls: "← → / A D move · Space / ↑ jump · Tap to jump",
-    objective: "Dodge the spikes. Your score increases with survival time.",
+    controls:
+      "← → / A D move · Space / ↑ double jump · Shift / X phase dash · Tap to jump",
+    objective:
+      "Three shields, double jumps and a rechargeable phase dash. Chain shards up to ×5 and dodge spikes and hovering drones.",
   },
   {
     id: "sunset-circuit",
@@ -43,12 +45,13 @@ export const games: GameDefinition[] = [
     category: "Shooters",
     type: "2D · SURVIVAL",
     art: "space",
-    tag: "NEW",
-    desc: "One pilot. A sky full of trouble.",
+    tag: "DELUXE",
+    desc: "Enemy squadrons. Nova bursts. A dreadnought on the horizon.",
     playable: true,
-    controls: "Arrow keys / WASD move · Auto-fire · Drag to steer on touch",
+    controls:
+      "Arrow keys / WASD move · Auto-fire · Space nova burst · Drag to steer on touch",
     objective:
-      "Destroy incoming drones. You have 3 shields; survive as waves get faster.",
+      "Clear enemy waves and a boss every third wave. Collect shield/triple-shot upgrades. A fully charged nova clears hostile shots and damages enemies.",
   },
   {
     id: "prism-break",
@@ -56,12 +59,12 @@ export const games: GameDefinition[] = [
     category: "Arcade",
     type: "2D · SKILL",
     art: "prism",
-    tag: "NEW",
-    desc: "Find your angle. Shatter the spectrum.",
+    tag: "DELUXE",
+    desc: "Three sectors. Armored crystals. Find the perfect ricochet.",
     playable: true,
     controls: "← → / A D or pointer to move · Space / tap to launch",
     objective:
-      "Clear every crystal with 3 lives. Paddle position controls the bounce angle.",
+      "Clear three sectors with 3 lives. Catch wide-paddle and slow-field power-ups, break armored crystals twice, and build ricochet chains. Challenge score: up to 2,400.",
   },
   {
     id: "tile-shift",
@@ -69,12 +72,13 @@ export const games: GameDefinition[] = [
     category: "Puzzles",
     type: "2D · PUZZLE",
     art: "tiles",
-    tag: "NEW",
-    desc: "Fifteen tiles. One satisfying solution.",
+    tag: "DELUXE",
+    desc: "Slide into place. Three difficulties. One satisfying solution.",
     playable: true,
-    controls: "Click / tap a tile beside the gap · Arrow keys move the gap",
+    controls:
+      "Click / tap a tile beside the gap · Arrow keys move the gap · U undo · H hint",
     objective:
-      "Arrange tiles 1–15 from left to right with the gap at the bottom right. Fewer moves and faster solves earn more points.",
+      "Arrange tiles 1–15 with the gap at bottom right. Choose Easy, Normal or Hard. Undo costs 120 points; a suggested-move hint costs 600. Hints are legal suggestions, not an optimal solver.",
   },
   {
     id: "cloudbound",

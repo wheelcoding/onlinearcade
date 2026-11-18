@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { ArcadeSimulation, noArcadeInput } from "@onlinearcade/core";
 import { PGlite } from "@electric-sql/pglite";
 const alice = "11111111-1111-4111-8111-111111111111",
   bob = "22222222-2222-4222-8222-222222222222";
@@ -88,6 +89,40 @@ test("Supabase migration enforces ownership, idempotency, limits and per-track c
       120000,
       39000,
     );
+    // Exercise the shipped scoring model against the existing production RPC contract.
+    const deluxePrism = new ArcadeSimulation("prism-break", 42);
+    deluxePrism.stage = 3;
+    deluxePrism.crystals = [];
+    deluxePrism.bestCombo = 18;
+    deluxePrism.finish(true);
+    await run(
+      crypto.randomUUID(),
+      "prism-break",
+      "default",
+      deluxePrism.totalScore,
+    );
+    const deluxeShooter = new ArcadeSimulation("starfall", 42);
+    deluxeShooter.countdown = 0;
+    deluxeShooter.spawned = 8;
+    deluxeShooter.step(noArcadeInput());
+    deluxeShooter.finish();
+    await run(
+      crypto.randomUUID(),
+      "starfall",
+      "default",
+      deluxeShooter.totalScore,
+    );
+    const deluxePuzzle = new ArcadeSimulation("tile-shift", 42);
+    deluxePuzzle.board = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 0, 15];
+    deluxePuzzle.previousBoard = [...deluxePuzzle.board];
+    deluxePuzzle.hint();
+    deluxePuzzle.tile(15);
+    await run(
+      crypto.randomUUID(),
+      "tile-shift",
+      "default",
+      deluxePuzzle.totalScore,
+    );
     await asUser(bob);
     await db.query("SELECT public.oa_profile($1)", ["Bob"]);
     own = await db.query("SELECT count(*)::int AS count FROM public.oa_runs");
@@ -158,7 +193,10 @@ test("Supabase migration enforces ownership, idempotency, limits and per-track c
       false,
     );
     await asUser(alice);
-    for (let n = 0; n < 27; n++)
+    const used = await db.query<{ used: number }>(
+      "SELECT count(*)::int AS used FROM public.oa_runs",
+    );
+    for (let n = used.rows[0].used; n < 30; n++)
       await run(crypto.randomUUID(), "starfall", "default", 100);
     await assert.rejects(
       run(crypto.randomUUID(), "starfall", "default", 100),

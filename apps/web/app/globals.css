@@ -4155,3 +4155,109 @@ button:active:not(:disabled) {
     font-size: 12px;
   }
 }
+/* Deluxe arcade: large touch-friendly puzzle board and clear assist controls. */
+.puzzle-canvas {
+  aspect-ratio: 1;
+  max-width: 640px;
+  margin: auto;
+  background: #112733;
+}
+.puzzle-stage {
+  background: #10232e;
+}
+.puzzle-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 18px 0;
+  color: #c9d8cb;
+}
+.puzzle-toolbar label {
+  font-size: 11px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.puzzle-toolbar select {
+  background: #1d303a;
+  border: 1px solid #49606a;
+  padding: 10px;
+  border-radius: 6px;
+  color: #e9e2cf;
+}
+.puzzle-toolbar button {
+  padding: 10px 12px;
+  font-size: 10px;
+  background: #23363d;
+  border: 1px solid #4c666d;
+  border-radius: 6px;
+}
+.puzzle-toolbar button:disabled {
+  opacity: 0.4;
+}
+.game-toolbar {
+  flex-wrap: wrap;
+}
+.medal-targets {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 25px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  padding: 14px;
+  background: #ffffff04;
+  border-radius: 8px;
+}
+.medal-targets > span {
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: #a9b5ad;
+}
+.medal-targets b {
+  font-size: 10px;
+  color: #e3bc7c;
+}
+.medal-targets em {
+  font-family: monospace;
+  font-style: normal;
+  color: #e1e9d8;
+  margin-left: 5px;
+}
+.tour-result .race-coach {
+  max-width: 450px;
+  margin: 8px auto;
+  line-height: 1.6;
+  color: #f4cba4;
+}
+@media (max-width: 650px) {
+  .puzzle-toolbar {
+    gap: 6px;
+  }
+  .puzzle-toolbar label {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .puzzle-toolbar button {
+    flex: 1;
+    font-size: 9px;
+    padding: 10px 6px;
+  }
+  .medal-targets {
+    gap: 12px;
+  }
+  .medal-targets > span {
+    width: 100%;
+    text-align: center;
+  }
+  .medal-targets b {
+    font-size: 9px;
+  }
+  .puzzle-canvas {
+    min-height: 0;
+  }
+}
+.advanced-dialog:fullscreen .puzzle-canvas {
+  width: min(100%, 72vh);
+}

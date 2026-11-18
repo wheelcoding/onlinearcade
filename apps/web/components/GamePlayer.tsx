@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import type { GameId } from "@onlinearcade/core";
+import type { PuzzleDifficulty, GameId } from "@onlinearcade/core";
 import type { GameControl } from "./games/PhaserArcade";
 import { gameById } from "../lib/catalog";
 const PhaserArcade = dynamic(() => import("./games/PhaserArcade"), {
@@ -38,7 +38,11 @@ function ArcadePlayer({
     }),
     [error, setError] = useState(""),
     [paused, setPaused] = useState(false),
-    [help, setHelp] = useState(true);
+    [help, setHelp] = useState(true),
+    [muted, setMuted] = useState(false),
+    [puzzleDifficulty, setPuzzleDifficulty] =
+      useState<PuzzleDifficulty>("normal"),
+    [nextDifficulty, setNextDifficulty] = useState<PuzzleDifficulty>("normal");
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
@@ -50,7 +54,7 @@ function ArcadePlayer({
       if (e.key === "Escape") close.current();
       if (e.key === "Tab") {
         const nodes = dialog.current?.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [tabindex="0"]',
+          'button:not([disabled]), select, [tabindex="0"]',
         );
         if (!nodes?.length) return;
         const first = nodes[0],
@@ -108,8 +112,59 @@ function ArcadePlayer({
             ✕
           </button>
         </div>
-        <div className="engine-stage">
+        {gameId === "tile-shift" && (
+          <div className="puzzle-toolbar">
+            <label>
+              Puzzle difficulty{" "}
+              <select
+                value={nextDifficulty}
+                onChange={(e) =>
+                  setNextDifficulty(e.target.value as PuzzleDifficulty)
+                }
+              >
+                <option value="easy">Easy · warm up</option>
+                <option value="normal">Normal · find your flow</option>
+                <option value="hard">Hard · deep shuffle</option>
+              </select>
+            </label>
+            <button
+              onClick={() => {
+                if (nextDifficulty === puzzleDifficulty)
+                  control.current?.restart();
+                else setPuzzleDifficulty(nextDifficulty);
+                setPaused(false);
+                control.current?.pause(false);
+              }}
+            >
+              New puzzle
+            </button>
+            <button
+              disabled={hud.ended || paused || !!error}
+              onClick={() => {
+                control.current?.key("KeyU", true);
+                control.current?.key("KeyU", false);
+              }}
+            >
+              ↶ Undo · −120
+            </button>
+            <button
+              disabled={hud.ended || paused || !!error}
+              onClick={() => {
+                control.current?.key("KeyH", true);
+                control.current?.key("KeyH", false);
+              }}
+            >
+              ◇ Hint · −600
+            </button>
+          </div>
+        )}
+        <div
+          className={`engine-stage ${gameId === "tile-shift" ? "puzzle-stage" : ""}`}
+        >
           <Engine
+            muted={muted}
+            puzzleDifficulty={puzzleDifficulty}
+            onPauseRequest={togglePause}
             gameId={gameId}
             onScore={onScore}
             onHud={setHud}
@@ -178,6 +233,9 @@ function ArcadePlayer({
           >
             ↻ Restart
           </button>
+          <button aria-pressed={muted} onClick={() => setMuted(!muted)}>
+            {muted ? "Sound off" : "Sound on"}
+          </button>
           <button onClick={() => setHelp(!help)} aria-expanded={help}>
             ? How to play
           </button>
@@ -209,14 +267,37 @@ function ArcadePlayer({
             ["ArrowRight", "→"],
             ["ArrowUp", gameId === "sunset-circuit" ? "GAS ↑" : "↑"],
             ["ArrowDown", gameId === "sunset-circuit" ? "BRAKE ↓" : "↓"],
-            ["Space", "ACTION"],
+            [
+              "Space",
+              gameId === "neon-dash"
+                ? "JUMP ↑"
+                : gameId === "starfall"
+                  ? "NOVA ◇"
+                  : "LAUNCH",
+            ],
+            ...(gameId === "neon-dash" ? [["ShiftLeft", "DASH ⚡"]] : []),
           ]
-            .filter(([k]) => gameId !== "tile-shift" || k !== "Space")
+            .filter(
+              ([k]) =>
+                (gameId !== "tile-shift" || k !== "Space") &&
+                (gameId !== "neon-dash" ||
+                  (k !== "ArrowDown" && k !== "ArrowUp")) &&
+                (gameId !== "prism-break" ||
+                  (k !== "ArrowUp" && k !== "ArrowDown")),
+            )
             .map(([key, label]) => (
               <button
                 key={key}
                 aria-label={
-                  key === "Space" ? "Action" : key.replace("Arrow", "Move ")
+                  key === "Space"
+                    ? gameId === "neon-dash"
+                      ? "Jump"
+                      : gameId === "starfall"
+                        ? "Nova burst"
+                        : "Launch ball"
+                    : key === "ShiftLeft"
+                      ? "Phase dash"
+                      : key.replace("Arrow", "Move ")
                 }
                 onPointerDown={(e) => {
                   e.currentTarget.setPointerCapture(e.pointerId);

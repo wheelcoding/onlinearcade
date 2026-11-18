@@ -91,3 +91,15 @@ The regression suite drives every circuit using the real simulation and checks A
 ## Supabase accounts and cloud records
 
 Email/password sign-up, sign-in, email confirmation, password reset, public display names, cross-device records and per-game/per-track **community (unverified)** boards are implemented. Activate them using [Supabase setup](docs/supabase-setup.md): run the Supabase migration, configure Auth redirects/email delivery, add the two public repository build variables, then run a new Pages deployment. Never use a secret/service-role key in the frontend. The optional backend activation does not affect guest play or require moving the site off GitHub Pages.
+
+## Deluxe arcade update
+
+All five playable games now have richer procedural graphics and feedback. The four 2D games share a fixed-step 120 Hz simulation and an accessible game shell with pause, restart, touch controls, fullscreen, loading/error states and optional synthesized sound. No external art/audio assets are downloaded.
+
+- **Neon Dash:** three shields, forgiving variable-height double jumps, buffered jump input, shard chains up to ×5, phase dashing with rechargeable energy, spike/double-spike/drone patterns, animated runner, rain and a layered neon skyline.
+- **Starfall:** scouts, weaving drones and aimed-fire gunners, escalating finite waves, a damageable dreadnought every third wave, a rechargeable nova burst, shield/triple-shot pickups, kill chains, detailed ships and planetary scenery.
+- **Prism Break:** three distinct sectors, two-hit armored crystals, accurate fixed-step ball contacts, ricochet chains, wide-paddle/slow-field pickups, faceted crystals and a persistent ball trail. Challenge scoring combines sector progress and chain skill into the existing 0–2,400 cloud score range in 50-point increments.
+- **Tile Shift:** Easy/Normal/Hard solvable shuffles, a larger square board for mobile, smooth tile movement, legal-neighbor and correct-position feedback, undo (120-point penalty), and a legal suggested-move hint (600-point penalty). Hints use Manhattan distance and do not claim to be an optimal puzzle solver. U/H also invoke these assists.
+- **Sunset Circuit:** biome-specific atmosphere (snow, dust, rain and sun motes), more detailed fallback scenery and visible boost strips, explicit Time Trial medal targets and a result-based driving tip. Existing driving physics, local career/ghost format and cloud timing contracts are preserved.
+
+Only finished runs submit scores. The existing Supabase migration remains compatible: shooter bonuses stay in 100-point increments, puzzle penalties preserve 10-point increments, and Prism stays within its server-enforced score limit. Regression tests submit scores produced by the new simulation through the actual SQL RPC in PGlite. Historical community results remain casual and unverified across gameplay updates. No database migration or new credentials are needed.
