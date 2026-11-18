@@ -3871,3 +3871,287 @@ button:active:not(:disabled) {
     letter-spacing: 0.5px;
   }
 }
+/* Private party lobby and room chat */
+.party-explainer {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 25px 0;
+  color: #d98e54;
+  font: 12px monospace;
+}
+.party-explainer b {
+  display: block;
+  color: var(--cream);
+  font:
+    600 15px Arial,
+    sans-serif;
+  margin: 7px 0;
+}
+.party-explainer small {
+  font:
+    11px/1.6 Arial,
+    sans-serif;
+  color: #a59a8d;
+  display: block;
+}
+.party-intro .party-privacy {
+  font-size: 11px;
+  line-height: 1.7;
+  max-width: 450px;
+  color: #a59a8d;
+}
+.party-invite {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #211e19;
+  border: 1px dashed #73583c;
+  border-radius: 9px;
+  padding: 14px;
+  margin: 18px 0;
+}
+.party-invite code {
+  font: 700 28px monospace;
+  letter-spacing: 5px;
+  color: #f2bf8b;
+  user-select: all;
+}
+.party-invite button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  padding: 8px;
+  border-radius: 5px;
+  background: #ffffff08;
+}
+.party-panel .panel-title h3 span {
+  display: block;
+  font-size: 10px;
+  margin-top: 6px;
+  color: #a79e90;
+}
+.party-player-name {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.players .party-player-name small {
+  display: block;
+  margin: 5px 0 0;
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+.party-panel .players li {
+  gap: 10px;
+}
+.party-ready-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 16px 0 10px;
+  flex-wrap: wrap;
+}
+.party-ready-actions button {
+  padding: 12px 15px;
+  font-size: 11px;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+.party-ready-actions > span {
+  font-size: 11px;
+  color: #b4a797;
+}
+.party-panel button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.party-panel .muted {
+  font-size: 10px;
+  line-height: 1.7;
+  display: block;
+  color: #a79e90;
+}
+.party-chat {
+  margin-top: 24px;
+  border-top: 1px solid #ffffff18;
+  padding-top: 17px;
+}
+.chat-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.chat-heading h4 {
+  font-size: 14px;
+  margin: 0;
+}
+.chat-heading span {
+  font-size: 9px;
+  color: #a79e90;
+}
+.chat-messages {
+  height: 230px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 14px 0;
+  padding: 6px;
+  background: #17161380;
+  border: 1px solid #ffffff0e;
+  border-radius: 8px;
+}
+.chat-message {
+  padding: 10px;
+  border-radius: 7px;
+  background: #ffffff05;
+  margin-bottom: 7px;
+}
+.chat-message.own {
+  background: #f4a05f10;
+  border-left: 2px solid #c58b5e;
+}
+.chat-message > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 10px;
+}
+.chat-message b {
+  color: #efc397;
+  overflow-wrap: anywhere;
+}
+.chat-message time {
+  font-size: 8px;
+  color: #a79e90;
+  white-space: nowrap;
+}
+.chat-message p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #e5ddce;
+  margin: 7px 0 0;
+}
+.chat-empty {
+  color: #a79e90;
+  font-size: 11px;
+  text-align: center;
+  padding: 65px 15px;
+  line-height: 1.7;
+}
+.chat-compose {
+  display: flex;
+  gap: 8px;
+}
+.chat-compose input {
+  flex: 1;
+  min-width: 0;
+  background: #211e19;
+  border: 1px solid #534635;
+  color: #efe4cf;
+  border-radius: 7px;
+  padding: 12px;
+  font-size: 12px;
+}
+.chat-compose button {
+  background: #f4a05f;
+  color: #2c2117;
+  border-radius: 7px;
+  padding: 12px;
+}
+.chat-limit {
+  display: block;
+  text-align: right;
+  color: #a79e90;
+  font-size: 8px;
+  margin-top: 8px;
+}
+.party-notice {
+  padding: 12px;
+  background: #dfb98112;
+  font-size: 11px;
+  line-height: 1.6;
+  border-radius: 7px;
+  color: #e8cda8;
+}
+.party-reconnect {
+  margin-bottom: 18px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #de9d5312;
+  border: 1px solid #765a39;
+}
+.party-reconnect p {
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 0 0 10px;
+}
+.party-reconnect button {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 10px;
+  border: 1px solid #7c6348;
+  border-radius: 5px;
+  padding: 7px;
+}
+.party-setup-note h3 {
+  margin: 14px 0;
+  font-size: 20px;
+}
+.party-setup-note p {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #b7ab99;
+}
+.party-setup-note a {
+  text-decoration: underline;
+  color: #f0b77e;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@media (max-width: 650px) {
+  .party-explainer {
+    gap: 8px;
+  }
+  .party-explainer small {
+    font-size: 9px;
+  }
+  .party-explainer b {
+    font-size: 13px;
+  }
+  .party-invite code {
+    font-size: 25px;
+  }
+  .chat-heading span {
+    font-size: 8px;
+  }
+  .chat-messages {
+    height: 210px;
+  }
+  .party-panel .panel-title h3 {
+    font-size: 17px;
+  }
+  .party-ready-actions button {
+    flex: 1;
+    justify-content: center;
+  }
+  .party-panel .players .text-button {
+    font-size: 9px;
+  }
+  .party-player-name {
+    font-size: 12px;
+  }
+}

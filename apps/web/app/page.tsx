@@ -14,7 +14,7 @@ import GameArtwork from "../components/GameArtwork";
 import { useAccount } from "../components/account/AccountProvider";
 import AccountDialog from "../components/account/AccountDialog";
 import CloudLeaderboard from "../components/account/CloudLeaderboard";
-import { io, Socket } from "socket.io-client";
+import PartyLobby from "../components/PartyLobby";
 import {
   Gamepad2,
   ArrowUpRight,
@@ -30,9 +30,7 @@ import {
   PartyPopper,
   Puzzle,
   Joystick,
-  Plus,
   Check,
-  Copy,
 } from "lucide-react";
 const NeonDash = dynamic(() => import("../components/NeonDash"), {
   ssr: false,
@@ -51,13 +49,6 @@ const categories = [
   ["Puzzles", Puzzle],
   ["Arcade", Joystick],
 ] as const;
-type Party = {
-  code: string;
-  host: string;
-  players: { id: string; name: string }[];
-  session: string | null;
-};
-
 export default function Home() {
   const cloud = useAccount();
   const [boardMode, setBoardMode] = useState<"local" | "community">(
@@ -70,90 +61,17 @@ export default function Home() {
     [guestName, setGuestName] = useState("Player"),
     [progress, setProgress] = useState<LocalProgress>(emptyProgress),
     [boardGame, setBoardGame] = useState<GameId>("neon-dash"),
-    [storageNotice, setStorageNotice] = useState(""),
-    [socket, setSocket] = useState<Socket | null>(null),
-    [online, setOnline] = useState<number | null>(null),
-    [connection, setConnection] = useState("Connecting"),
-    [party, setParty] = useState<Party | null>(null),
-    [code, setCode] = useState(""),
-    [error, setError] = useState(""),
-    [pending, setPending] = useState(false),
-    [notice, setNotice] = useState(""),
-    [copied, setCopied] = useState(false);
+    [storageNotice, setStorageNotice] = useState("");
   useEffect(() => {
     try {
       setProgress(new BrowserProgressRepository(localStorage).load());
       setGuestName(localStorage.getItem("oa-name") || "Player");
     } catch {}
-    const endpoint =
-      process.env.NEXT_PUBLIC_MULTIPLAYER_URL ||
-      (["localhost", "127.0.0.1"].includes(location.hostname)
-        ? "http://localhost:3001"
-        : null);
-    if (!endpoint) {
-      setConnection("Offline");
-      return;
-    }
-    const s = io(endpoint, { reconnectionAttempts: 5 });
-    setSocket(s);
-    s.on("connect", () => setConnection("Connected"));
-    s.on("connect_error", () => {
-      setConnection("Offline");
-      setOnline(null);
-    });
-    s.on("disconnect", () => {
-      setConnection("Offline");
-      setOnline(null);
-      setParty(null);
-    });
-    s.on("presence", (p) => {
-      if (Number.isInteger(p.online)) setOnline(p.online);
-    });
-    s.on("party", setParty);
-    let timer: ReturnType<typeof setTimeout>;
-    s.on("session", (data) => {
-      clearTimeout(timer);
-      setNotice(
-        "Party run starts in 3 seconds. Each player runs independently.",
-      );
-      timer = setTimeout(
-        () => {
-          setPlaying("neon-dash");
-          setNotice("");
-        },
-        Math.max(0, data.startsAt - Date.now()),
-      );
-    });
-    return () => {
-      clearTimeout(timer);
-      s.disconnect();
-    };
   }, []);
   useEffect(() => {
     if (cloud.recovering) setProfile(true);
   }, [cloud.recovering]);
   const name = cloud.account?.displayName || guestName;
-  function action(action: string) {
-    if (!socket?.connected) {
-      setError(
-        "Multiplayer is offline. Start the server or check your connection.",
-      );
-      return;
-    }
-    setPending(true);
-    setError("");
-    socket
-      .timeout(5000)
-      .emit(
-        "party:action",
-        { action, name, code: code.toUpperCase() },
-        (err: Error | null, result: { error?: string }) => {
-          setPending(false);
-          if (err) setError("Request timed out. Please try again.");
-          else if (result?.error) setError(result.error);
-        },
-      );
-  }
   const records =
     (cloud.user ? cloud.progress : progress).games[boardGame] || emptyStats();
   function saveScore(gameId: GameId, score: number) {
@@ -367,138 +285,12 @@ export default function Home() {
             <span>Stay for one more round. ↗</span>
           </p>
         </section>
-        <section id="multiplayer" className="multiplayer">
-          <div className="party-intro">
-            <span className="eyebrow">
-              <Users size={15} /> THE MORE, THE MERRIER
-            </span>
-            <h2>
-              Same party.
-              <br />
-              <em>Different screens.</em>
-            </h2>
-            <p>
-              Round up your crew. Create a private party, share your code, and
-              make game night happen.
-            </p>
-            <div className="connection">
-              <span
-                className={`dot ${connection === "Connected" ? "" : "offline"}`}
-              />
-              {online !== null
-                ? `${online} player${online === 1 ? "" : "s"} connected`
-                : connection === "Connecting"
-                  ? "Connecting to the arcade…"
-                  : "Multiplayer server offline"}
-              <span>• Up to 8 per party</span>
-            </div>
-          </div>
-          <div className="party-panel">
-            {party ? (
-              <>
-                <div className="panel-title">
-                  <h3>
-                    Your party <span>{party.players.length}/8</span>
-                  </h3>
-                  <button
-                    className="text-button"
-                    disabled={pending}
-                    onClick={() => action("leave")}
-                  >
-                    Leave
-                  </button>
-                </div>
-                <button
-                  className="party-code"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(party.code);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    } catch {
-                      setError(
-                        "Copy unavailable. Select the party code manually.",
-                      );
-                    }
-                  }}
-                >
-                  {party.code}
-                  {copied ? <Check size={17} /> : <Copy size={17} />}
-                </button>
-                <ul className="players">
-                  {party.players.map((p) => (
-                    <li key={p.id}>
-                      <span className="avatar">{p.name[0]}</span>
-                      {p.name}
-                      <small>{p.id === party.host ? "HOST" : "PLAYER"}</small>
-                    </li>
-                  ))}
-                </ul>
-                {party.host === socket?.id ? (
-                  <button
-                    className="primary full"
-                    disabled={pending}
-                    onClick={() => action("start")}
-                  >
-                    Start a party run <ArrowRight size={16} />
-                  </button>
-                ) : (
-                  <p>Waiting for the host to start a run.</p>
-                )}
-                <small className="muted">
-                  Synchronized start · independent Neon Dash runs
-                </small>
-              </>
-            ) : (
-              <>
-                <div className="panel-title">
-                  <h3>Your crew starts here</h3>
-                  <Gamepad2 size={22} />
-                </div>
-                <label className="field-label">
-                  Player name
-                  <input
-                    maxLength={20}
-                    value={name}
-                    onChange={(e) => setGuestName(e.target.value)}
-                    disabled={!!cloud.user}
-                    placeholder="Your name"
-                  />
-                </label>
-                <button
-                  className="primary full"
-                  disabled={pending}
-                  onClick={() => action("create")}
-                >
-                  <Plus size={18} />
-                  {pending ? "Please wait…" : "Create Party"}
-                  <ArrowUpRight size={17} />
-                </button>
-                <div className="divider">
-                  <span>or join your friends</span>
-                </div>
-                <div className="join-row">
-                  <input
-                    aria-label="Party code"
-                    maxLength={6}
-                    placeholder="Enter party code"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.toUpperCase())}
-                  />
-                  <button disabled={pending} onClick={() => action("join")}>
-                    Join Party <ArrowRight size={16} />
-                  </button>
-                </div>
-              </>
-            )}
-            {error && (
-              <p className="error" role="alert">
-                {error}
-              </p>
-            )}
-            {notice && <p role="status">{notice}</p>}
-          </div>
-        </section>
+        <PartyLobby
+          name={name}
+          onNameChange={setGuestName}
+          signedIn={!!cloud.user}
+          onStart={() => setPlaying("neon-dash")}
+        />
         <section id="leaderboards" className="leaderboards">
           <div className="section-heading">
             <div>
