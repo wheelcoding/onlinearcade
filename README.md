@@ -32,9 +32,11 @@ Use Left/Right arrows or A/D to move and Space/Up to double jump. Collect gold s
 
 ## Multiplayer scope
 
-Real server-connected presence, private six-character codes, up to eight players, create/join/leave, host transfer on disconnect, and synchronized independent Neon Dash starts. This is a party/session foundation: it does not simulate shared player movement or verify scores. No fabricated player counts, wins, rankings, or game statistics. Rooms and sessions are in memory and reset when the server restarts. Users have local display names, not authenticated accounts.
+Real server-connected presence, private six-character room codes, up to eight members, create/join/leave, ready checks, host transfer, host removal controls, room-only chat, and synchronized independent Neon Dash launches. A refresh or temporary disconnect can restore the same member using a private tab-scoped resume token for 45 seconds. Online counts are actual server connections, not unique account counts. Guest names are not verified account identities.
 
-Server validates actions, names, codes, capacity and host permissions. Each socket has a token bucket (15 burst, 1 request/second refill); payload limit 4 KB. For public production deploy behind a TLS reverse proxy with IP-based connection limits, and add authentication, durable rooms, score verification and a shared Socket.IO adapter before scaling horizontally.
+The server validates membership, names, codes, capacity, ready checks, host permissions and chat (1–300 characters, bounded to the latest 50 messages). Each socket has a token bucket (15 burst, 1 action/second refill), a separate chat limiter (5 burst, 1 message per 1.5 seconds), a 4 KB message limit, and connection limits. Resume credentials never appear in room snapshots or chat; leave/kick invalidates them. Rooms/chat are memory-only and reset on server restarts. This does not simulate shared movement or verify competitive scores.
+
+To activate the public service, follow **[multiplayer deployment](docs/multiplayer-deployment.md)**. The included Render blueprint provides a free deployment; it requires a Render account and the actual public service URL in GitHub's `NEXT_PUBLIC_MULTIPLAYER_URL` variable, followed by a Pages rebuild. Free instances can sleep; automatic reconnect handles cold starts. Without activation the website explicitly says setup is needed and does not display a fabricated online state.
 
 ## Production
 

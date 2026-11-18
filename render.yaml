@@ -1,0 +1,20 @@
+# GitHub Pages serves the website; Render serves the persistent Socket.IO process.
+services:
+  - type: web
+    name: onlinearcade-multiplayer
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci --include=dev && npm run build -w @onlinearcade/server
+    startCommand: npm run start -w @onlinearcade/server
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: WEB_ORIGIN
+        value: https://wheelcoding.github.io
+      - key: TRUST_PROXY
+        value: "true"
