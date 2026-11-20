@@ -120,3 +120,76 @@ test("practice AI can score in an open lane through actual driving", () => {
     s.advance(1 / 120, new Map([["b", boostballBot(s.state, "b")]]));
   assert.ok(s.state.score[1] > 0);
 });
+
+test("jump requires release, boost extends airtime, and cars land safely", () => {
+  const make = () => {
+    const s = new BoostballSimulation(roster);
+    s.state.countdown = 0;
+    return s;
+  };
+  const normal = make(),
+    boosted = make();
+  let high = 0,
+    boostHigh = 0;
+  for (let i = 0; i < 180; i++) {
+    normal.advance(1 / 120, new Map([["a", { ...BALL_IDLE, jump: true }]]));
+    boosted.advance(
+      1 / 120,
+      new Map([["a", { ...BALL_IDLE, jump: true, boost: true }]]),
+    );
+    high = Math.max(high, normal.state.cars[0].height);
+    boostHigh = Math.max(boostHigh, boosted.state.cars[0].height);
+  }
+  assert.ok(high > 40);
+  assert.ok(boostHigh > high + 20);
+  assert.equal(normal.state.cars[0].height, 0);
+  run(normal, 1, new Map([["a", { ...BALL_IDLE, jump: true }]]));
+  assert.equal(normal.state.cars[0].height, 0);
+  run(normal, 0.02);
+  run(normal, 0.1, new Map([["a", { ...BALL_IDLE, jump: true }]]));
+  assert.ok(normal.state.cars[0].height > 10);
+  run(boosted, 4);
+  assert.equal(boosted.state.cars[0].height, 0);
+  assert.equal(boosted.state.cars[0].vz, 0);
+});
+
+test("airborne balls bounce off the floor and a shot above the crossbar cannot score", () => {
+  const s = new BoostballSimulation(roster);
+  s.state.countdown = 0;
+  s.state.ball = { x: 600, y: 130, vx: 0, vy: 0, height: 80, vz: -80 };
+  run(s, 0.6);
+  assert.ok(s.state.ball.height! >= 17);
+  assert.ok(s.state.ball.vz! > 0);
+  s.state.ball = { x: 900, y: 270, vx: 400, vy: 0, height: 110, vz: 0 };
+  run(s, 0.12);
+  assert.deepEqual(s.state.score, [0, 0]);
+  assert.ok(s.state.ball.vx < 0);
+  s.state.ball = { x: 900, y: 270, vx: 400, vy: 0, height: 30, vz: 0 };
+  run(s, 0.2);
+  assert.deepEqual(s.state.score, [1, 0]);
+  assert.equal(s.state.ball.height, 17);
+  assert.equal(s.state.cars[0].height, 0);
+});
+
+test("airborne cars clear grounded opponents and share identical jump trajectories across frame rates", () => {
+  const heights = [30, 60, 144].map((fps) => {
+    const s = new BoostballSimulation(roster);
+    s.state.countdown = 0;
+    for (let i = 0; i < fps * 0.5; i++)
+      s.advance(1 / fps, new Map([["a", { ...BALL_IDLE, jump: true }]]));
+    return s.state.cars[0].height;
+  });
+  assert.ok(Math.max(...heights) - Math.min(...heights) < 0.01);
+  const s = new BoostballSimulation(roster);
+  s.state.countdown = 0;
+  const a = s.state.cars[0],
+    b = s.state.cars[1];
+  a.x = b.x = 480;
+  a.y = b.y = 270;
+  a.height = 70;
+  a.vz = 0;
+  s.state.ball.x = 800;
+  run(s, 0.01);
+  assert.equal(a.x, b.x);
+  assert.equal(a.y, b.y);
+});

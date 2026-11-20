@@ -299,7 +299,7 @@ export default function PartyLobby({
                         (partyGame === "party-planet" &&
                           !lobby.features.includes("party-planet")) ||
                         (partyGame === "boostball" &&
-                          !lobby.features.includes("boostball"))
+                          !lobby.features.includes("boostball-3d"))
                       }
                       onClick={() =>
                         action({ action: "start", game: partyGame, track })
@@ -318,9 +318,9 @@ export default function PartyLobby({
                       ? "Everyone must be connected and ready."
                       : "Ready to go!"}{" "}
                   {partyGame === "boostball" &&
-                    !lobby.features.includes("boostball") && (
+                    !lobby.features.includes("boostball-3d") && (
                       <span role="status">
-                        Boostball needs the latest Render server
+                        Boostball 3D needs the latest Render server
                         deployment.{" "}
                       </span>
                     )}

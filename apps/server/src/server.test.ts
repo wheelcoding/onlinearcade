@@ -7,6 +7,7 @@ const event = <T = any>(
   s: Socket,
   n: string,
   matches: (value: T) => boolean = () => true,
+  timeoutMs = 3000,
 ) =>
   new Promise<T>((resolve, reject) => {
     const receive = (value: T) => {
@@ -18,7 +19,7 @@ const event = <T = any>(
     const timer = setTimeout(() => {
       s.off(n, receive);
       reject(new Error("Timed out waiting for " + n));
-    }, 3000);
+    }, timeoutMs);
     s.on(n, receive);
   });
 async function fixture(options: Parameters<typeof createArcadeServer>[1] = {}) {
@@ -461,18 +462,25 @@ test("Boostball launches one shared match, isolates room snapshots and accepts o
         a.emit("ball:input", {
           sessionId: started.id,
           seq: Date.now(),
-          input: { throttle: 1, steer: 0, boost: true, dodge: false },
+          input: {
+            throttle: 1,
+            steer: 0,
+            boost: true,
+            dodge: false,
+            jump: true,
+          },
           score: 99999,
         }),
       40,
     );
     try {
-      await new Promise((r) => setTimeout(r, 3400));
+      await event<any>(a, "ball:state", (p) => p.cars[0].x > 240, 8000);
     } finally {
       clearInterval(controls);
     }
     assert.ok(packets.at(-1).cars[0].x > 240);
     assert.deepEqual(packets.at(-1).score, [0, 0]);
+    assert.ok(packets.at(-1).cars[0].height > 0);
     assert.equal(packets.at(-1).cars[1].x, 740);
     assert.equal(leaked, false);
     const left = event<any>(a, "ball:state", (value) => !value.cars[1].active);

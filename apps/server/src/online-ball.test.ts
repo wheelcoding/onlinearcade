@@ -21,6 +21,7 @@ test("ball controls reject spoofed ownership, invalid sessions, nonfinite values
     { ...cmd, input: { ...cmd.input, throttle: 2 } },
     { ...cmd, input: { ...cmd.input, steer: Infinity } },
     { ...cmd, input: { ...cmd.input, boost: "true" } },
+    { ...cmd, input: { ...cmd.input, jump: "true" } },
   ])
     assert.equal(game.command("a", raw, 1000), false);
   assert.equal(game.command("outsider", cmd, 1000), false);
@@ -41,4 +42,24 @@ test("ball controls reject spoofed ownership, invalid sessions, nonfinite values
   assert.ok(game.sim.state.cars[0].fuel > fuel2);
   game.exit("a");
   assert.equal(game.command("a", { ...cmd, seq: 3 }, 1700), false);
+});
+
+test("server owns jump height and rejects client-supplied altitude", () => {
+  const game = new OnlineBall("match", roster);
+  game.sim.state.countdown = 0;
+  assert.equal(
+    game.command(
+      "a",
+      { ...cmd, height: 99999, input: { ...cmd.input, jump: true } },
+      1000,
+    ),
+    true,
+  );
+  game.advance(0.1, new Set(["a", "b"]), 1050);
+  assert.ok(
+    game.sim.state.cars[0].height > 0 && game.sim.state.cars[0].height < 30,
+  );
+  game.advance(0.1, new Set(["a", "b"]), 1500);
+  assert.equal(game.inputs.get("a")?.input.jump, true);
+  assert.ok(Number.isFinite(game.sim.state.cars[0].height));
 });
