@@ -27,7 +27,7 @@ export default function PartyLobby({
   const lobby = useParty(onStart),
     { party, status, online, memberId, pending, action } = lobby;
   const [partyGame, setPartyGame] = useState<
-      "neon-dash" | "kart-circuit" | "party-planet"
+      "neon-dash" | "kart-circuit" | "party-planet" | "boostball"
     >("kart-circuit"),
     [track, setTrack] = useState<TrackId>("sunset-bay"),
     [code, setCode] = useState(""),
@@ -37,6 +37,11 @@ export default function PartyLobby({
     const select = () => setPartyGame("party-planet");
     window.addEventListener("oa:party-planet", select);
     return () => window.removeEventListener("oa:party-planet", select);
+  }, []);
+  useEffect(() => {
+    const select = () => setPartyGame("boostball");
+    window.addEventListener("oa:boostball", select);
+    return () => window.removeEventListener("oa:boostball", select);
   }, []);
   const messages = useRef<HTMLDivElement>(null),
     copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -236,6 +241,9 @@ export default function PartyLobby({
                         <option value="kart-circuit">
                           Sunset Circuit · shared race
                         </option>
+                        <option value="boostball">
+                          Boostball · team car soccer
+                        </option>
                         <option value="party-planet">
                           Party Planet · three mini-games
                         </option>
@@ -289,7 +297,9 @@ export default function PartyLobby({
                         !connected ||
                         !allReady ||
                         (partyGame === "party-planet" &&
-                          !lobby.features.includes("party-planet"))
+                          !lobby.features.includes("party-planet")) ||
+                        (partyGame === "boostball" &&
+                          !lobby.features.includes("boostball"))
                       }
                       onClick={() =>
                         action({ action: "start", game: partyGame, track })
@@ -307,6 +317,13 @@ export default function PartyLobby({
                     : !allReady
                       ? "Everyone must be connected and ready."
                       : "Ready to go!"}{" "}
+                  {partyGame === "boostball" &&
+                    !lobby.features.includes("boostball") && (
+                      <span role="status">
+                        Boostball needs the latest Render server
+                        deployment.{" "}
+                      </span>
+                    )}
                   Sunset Circuit uses a shared server-controlled race. Neon Dash
                   runs are independent.
                 </small>

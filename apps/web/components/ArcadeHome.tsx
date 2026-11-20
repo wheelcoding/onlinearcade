@@ -44,6 +44,9 @@ const Cloudbound = dynamic(() => import("../components/Cloudbound"), {
     </div>
   ),
 });
+const Boostball = dynamic(() => import("../components/Boostball"), {
+  ssr: false,
+});
 const PartyPlanet = dynamic(() => import("../components/PartyPlanet"), {
   ssr: false,
 });
@@ -70,6 +73,7 @@ const categories = [
 function ArcadeContent() {
   const cloud = useAccount();
   const [planetOpen, setPlanetOpen] = useState(false);
+  const [ballOpen, setBallOpen] = useState(false);
   const [cloudOpen, setCloudOpen] = useState(false);
   const [onlineRace, setOnlineRace] = useState<OnlineRaceLink | null>(null);
   const [boardMode, setBoardMode] = useState<"local" | "community">(
@@ -166,7 +170,7 @@ function ArcadeContent() {
               <span className="spark">✳</span>
             </h1>
             <p>
-              Your arcade. Your friends. Your games. Seven original worlds, one
+              Your arcade. Your friends. Your games. Eight original worlds, one
               more round.
             </p>
             <div className="hero-actions">
@@ -278,7 +282,7 @@ function ArcadeContent() {
                       {g.playable
                         ? g.id === "cloudbound"
                           ? "↗ Climb to your personal best"
-                          : g.id === "party-planet"
+                          : g.id === "party-planet" || g.id === "boostball"
                             ? "↗ Practice or play with friends"
                             : "↗ Chase your personal best"
                         : "Something good is on the way"}
@@ -288,9 +292,11 @@ function ArcadeContent() {
                         onClick={() =>
                           g.id === "cloudbound"
                             ? setCloudOpen(true)
-                            : g.id === "party-planet"
-                              ? setPlanetOpen(true)
-                              : setPlaying(g.id as GameId)
+                            : g.id === "boostball"
+                              ? setBallOpen(true)
+                              : g.id === "party-planet"
+                                ? setPlanetOpen(true)
+                                : setPlaying(g.id as GameId)
                         }
                         aria-label={`Play ${g.title}`}
                       >
@@ -312,7 +318,7 @@ function ArcadeContent() {
             </div>
           )}
           <p className="library-note">
-            Seven playable originals. Fresh challenges. No downloads.{" "}
+            Eight playable originals. Fresh challenges. No downloads.{" "}
             <span>Stay for one more round. ↗</span>
           </p>
         </section>
@@ -406,6 +412,7 @@ function ArcadeContent() {
           onNameChange={setGuestName}
           signedIn={!!cloud.user}
           onStart={(race) => {
+            setBallOpen(false);
             setPlanetOpen(false);
             setCloudOpen(false);
             if (race) {
@@ -583,6 +590,24 @@ function ArcadeContent() {
           onClose={() => setCloudOpen(false)}
         />
       )}
+      {(ballOpen || onlineRace?.session.game === "boostball") && (
+        <Boostball
+          link={
+            onlineRace?.session.game === "boostball" ? onlineRace : undefined
+          }
+          onClose={() => {
+            setBallOpen(false);
+            setOnlineRace(null);
+          }}
+          onFriends={() => {
+            setBallOpen(false);
+            window.dispatchEvent(new Event("oa:boostball"));
+            document
+              .getElementById("multiplayer")
+              ?.scrollIntoView({ behavior: "smooth" });
+          }}
+        />
+      )}
       {(planetOpen || onlineRace?.session.game === "party-planet") && (
         <PartyPlanet
           link={
@@ -601,7 +626,7 @@ function ArcadeContent() {
           }}
         />
       )}
-      {onlineRace && onlineRace.session.game !== "party-planet" && (
+      {onlineRace && onlineRace.session.game === "kart-circuit" && (
         <OnlineKart link={onlineRace} onClose={() => setOnlineRace(null)} />
       )}
       {playing === "neon-dash" && (
