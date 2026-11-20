@@ -1,4 +1,3 @@
-import AccountProvider from "../components/account/AccountProvider";
 import "./globals.css";
 export const metadata = {
   title: "wheelcoding",
@@ -12,9 +11,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
-        <AccountProvider>{children}</AccountProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

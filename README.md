@@ -129,3 +129,7 @@ The world uses original procedural islands, vines, trees, ruins, animated charac
 Reach the portal for a completion time and medal. Gold requires under 1:40 and no recoveries; silver requires under 2:40; all completions earn bronze. Checkpoints retain collected crystals. Best times are saved per guest/account **in this browser**, separately from existing cloud score contracts; they are not verified cloud leaderboard entries. The standalone versioned result model and record adapter leave room for a future dedicated Cloudbound leaderboard.
 
 Tests drive a continuous, non-teleporting climb through every island and collect all crystals, plus movement at 30/60/144 rendered Hz, rapid jump gestures, collision sweeps/undersides, moving-platform carry, crumbling recovery, checkpoint penalties and record validation. Network test waits also now match withdrawal state instead of accepting an unrelated in-flight snapshot (the intermittent deployment-test failure).
+
+### Minimal entry screen
+
+On each page load, the homepage shows only `wheelcoding` on white. Highlight the `wheel` prefix, then triple-click it to enter the arcade. The selection is remembered through the browser changing it during repeated clicks; clicking elsewhere resets the gesture. The arcade and account provider mount only after unlocking. The unlock lasts for the current page instance, so refreshing returns to the entry screen. This is a presentation gesture, while existing account and database permissions remain in place.
