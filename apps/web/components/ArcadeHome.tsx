@@ -17,6 +17,7 @@ import CloudLeaderboard from "../components/account/CloudLeaderboard";
 import type { OnlineRaceLink } from "../lib/use-party";
 import PartyLobby from "../components/PartyLobby";
 import {
+  Heart,
   Gamepad2,
   ArrowUpRight,
   ArrowRight,
@@ -543,6 +544,28 @@ function ArcadeContent() {
               </div>
             </div>
           )}
+        </section>
+        <section
+          className="support-banner"
+          aria-label="Support wheelcoding OnlineArcade"
+        >
+          <span className="support-banner-icon" aria-hidden="true">
+            <Heart size={27} />
+          </span>
+          <div className="support-banner-copy">
+            <span className="eyebrow">A LITTLE SUPPORT. A LOT OF PLAY.</span>
+            <h2>Support wheelcoding OnlineArcade</h2>
+            <p>Enjoying the games? Show your support.</p>
+          </div>
+          <a
+            className="support-banner-link"
+            href="https://square.link/u/re4xmK3B"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Support wheelcoding OnlineArcade (opens in a new tab)"
+          >
+            Support the arcade <ArrowUpRight size={19} aria-hidden="true" />
+          </a>
         </section>
         <footer>
           <a className="brand" href="#home">
