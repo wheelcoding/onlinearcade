@@ -300,21 +300,90 @@ export default function Home() {
             <span>Stay for one more round. ↗</span>
           </p>
         </section>
-        <aside className="grubhub-ad" aria-label="Grubhub referral advertisement">
-          <div className="grubhub-ad-copy">
-            <span className="eyebrow">AD · REFERRAL LINK</span>
-            <p className="grubhub-ad-brand">Grubhub</p>
-            <h2>Get $10 off when you place your first Grubhub order</h2>
+        <aside
+          className="grubhub-ad"
+          aria-label="Grubhub referral advertisement"
+        >
+          <div className="grubhub-ad-art" aria-hidden="true">
+            <span className="grubhub-spark spark-one">✦</span>
+            <span className="grubhub-spark spark-two">✦</span>
+            <svg viewBox="0 0 220 220" fill="none" focusable="false">
+              <circle
+                cx="110"
+                cy="111"
+                r="92"
+                fill="#E6C7A1"
+                fillOpacity=".12"
+              />
+              <circle cx="110" cy="111" r="78" fill="#F4DFC0" />
+              <circle
+                cx="110"
+                cy="111"
+                r="65"
+                stroke="#D7B88F"
+                strokeWidth="2"
+              />
+              <path
+                d="M59 69Q110 39 164 69L118 170Q113 179 108 170Z"
+                fill="#B25231"
+                fillOpacity=".25"
+                transform="translate(4 8)"
+              />
+              <path
+                d="M59 69Q110 39 164 69L118 170Q113 179 108 170Z"
+                fill="#F6BB62"
+                stroke="#CF7D3D"
+                strokeWidth="3"
+              />
+              <path d="M65 78Q110 52 157 78L114 166Z" fill="#F7DB8F" />
+              <path
+                d="M59 69Q110 39 164 69"
+                stroke="#D9944E"
+                strokeWidth="15"
+                strokeLinecap="round"
+              />
+              <path
+                d="M61 65Q110 38 162 65"
+                stroke="#F5C183"
+                strokeWidth="5"
+                strokeLinecap="round"
+              />
+              <circle cx="95" cy="87" r="13" fill="#C95D45" />
+              <circle cx="130" cy="98" r="12" fill="#C95D45" />
+              <circle cx="111" cy="130" r="11" fill="#C95D45" />
+              <path d="M112 77Q131 65 128 82Q119 90 112 77Z" fill="#638E66" />
+              <path d="M89 111Q75 116 91 126Q102 122 89 111Z" fill="#638E66" />
+              <circle cx="94" cy="83" r="3" fill="#E98B64" />
+              <circle cx="128" cy="94" r="3" fill="#E98B64" />
+              <circle cx="109" cy="127" r="3" fill="#E98B64" />
+            </svg>
+            <span className="grubhub-ad-sticker">
+              <strong>$10</strong>
+              <span>OFF YOUR FIRST ORDER</span>
+            </span>
           </div>
-          <a
-            className="grubhub-ad-link"
-            href="https://www.grubhub.com/referral/6c6f84c0-c2ab-11f1-a795-f3639ed6276f"
-            target="_blank"
-            rel="sponsored noopener noreferrer"
-          >
-            Click to get $10 off <ArrowUpRight size={20} aria-hidden="true" />
-            <span className="sr-only"> (opens in a new tab)</span>
-          </a>
+          <div className="grubhub-ad-copy">
+            <div className="grubhub-ad-topline">
+              <span className="grubhub-ad-brand">Grubhub</span>
+              <span className="grubhub-ad-disclosure">Ad · referral link</span>
+            </div>
+            <p className="grubhub-ad-kicker">FUEL YOUR NEXT ROUND</p>
+            <h2>
+              Get <span>$10 off</span> when you place your first Grubhub order
+            </h2>
+            <a
+              className="grubhub-ad-link"
+              href="https://www.grubhub.com/referral/6c6f84c0-c2ab-11f1-a795-f3639ed6276f"
+              target="_blank"
+              rel="sponsored noopener noreferrer"
+            >
+              Click to get $10 off{" "}
+              <span className="grubhub-ad-arrow">
+                <ArrowUpRight size={19} aria-hidden="true" />
+              </span>
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          </div>
         </aside>
         <PartyLobby
           name={name}
