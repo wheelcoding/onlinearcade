@@ -1,7 +1,7 @@
 import AccountProvider from "../components/account/AccountProvider";
 import "./globals.css";
 export const metadata = {
-  title: "OnlineArcade — Good games. Great company.",
+  title: "wheelcoding",
   description:
     "Your arcade. Your friends. Your games. Play Neon Dash and get your party together.",
 };
