@@ -266,3 +266,98 @@ test("health is deployable, and unapproved website origins cannot open a socket"
     await f.close();
   }
 });
+test("shared kart races require host/ready checks and isolate snapshots and controls to their room", async () => {
+  const f = await fixture();
+  try {
+    const a = await f.client(),
+      b = await f.client(),
+      outsider = await f.client();
+    const { state: room, credentials: owner } = await f.create(a, "Alex");
+    await f.action(b, { action: "join", name: "Sam", code: room.code });
+    await f.action(a, { action: "ready", ready: true });
+    await f.action(b, { action: "ready", ready: true });
+    assert.match(
+      (
+        await f.action(b, {
+          action: "start",
+          game: "kart-circuit",
+          track: "sunset-bay",
+        })
+      ).error!,
+      /host/,
+    );
+    assert.match(
+      (
+        await f.action(a, {
+          action: "start",
+          game: "kart-circuit",
+          track: "fake-track",
+        })
+      ).error!,
+      /valid/,
+    );
+    const session = event(a, "session");
+    assert.ok(
+      (
+        await f.action(a, {
+          action: "start",
+          game: "kart-circuit",
+          track: "sunset-bay",
+        })
+      ).ok,
+    );
+    const started = await session;
+    assert.equal(started.game, "kart-circuit");
+    assert.equal(started.racers.length, 2);
+    assert.equal(started.racers[0].memberId, owner.memberId);
+    let leaked = false;
+    outsider.on("race:state", () => {
+      leaked = true;
+    });
+    outsider.emit("race:sync", started.id);
+    const first = event(a, "race:state");
+    a.emit("race:sync", started.id);
+    const initial = await first;
+    assert.equal(initial.cars.length, 2);
+    const samples: any[] = [];
+    b.on("race:state", (p) => samples.push(p));
+    const controls = setInterval(
+      () =>
+        a.emit("race:input", {
+          sessionId: started.id,
+          seq: Date.now(),
+          input: {
+            throttle: 1,
+            brake: 0,
+            steer: 0,
+            drift: false,
+            boost: false,
+          },
+          x: 999999,
+        }),
+      40,
+    );
+    try {
+      await new Promise((r) => setTimeout(r, 3500));
+    } finally {
+      clearInterval(controls);
+    }
+    const latest = samples.at(-1);
+    assert.ok(latest.time > 0);
+    assert.ok(latest.cars[0].speed > 0);
+    assert.equal(latest.cars[1].lastInput.throttle, 0);
+    assert.notEqual(latest.cars[0].x, 999999);
+    assert.equal(leaked, false);
+    const withdrawn = event(b, "race:state");
+    a.emit("race:exit", started.id);
+    assert.ok((await withdrawn).withdrawn.includes(0));
+    a.emit("race:input", {
+      sessionId: started.id,
+      seq: Date.now() + 1,
+      input: { throttle: 1, brake: 0, steer: 0, drift: false, boost: false },
+    });
+    assert.ok((await f.action(a, { action: "leave" })).ok);
+  } finally {
+    await f.close();
+  }
+});

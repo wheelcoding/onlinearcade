@@ -11,7 +11,8 @@ import {
   Send,
   RefreshCw,
 } from "lucide-react";
-import { useParty } from "../lib/use-party";
+import { TRACKS, type TrackId } from "@onlinearcade/core";
+import { useParty, type OnlineRaceLink } from "../lib/use-party";
 export default function PartyLobby({
   name,
   onNameChange,
@@ -21,11 +22,15 @@ export default function PartyLobby({
   name: string;
   onNameChange: (name: string) => void;
   signedIn: boolean;
-  onStart: () => void;
+  onStart: (race?: OnlineRaceLink) => void;
 }) {
   const lobby = useParty(onStart),
     { party, status, online, memberId, pending, action } = lobby;
-  const [code, setCode] = useState(""),
+  const [partyGame, setPartyGame] = useState<"neon-dash" | "kart-circuit">(
+      "kart-circuit",
+    ),
+    [track, setTrack] = useState<TrackId>("sunset-bay"),
+    [code, setCode] = useState(""),
     [copied, setCopied] = useState(false),
     [draft, setDraft] = useState("");
   const messages = useRef<HTMLDivElement>(null),
@@ -79,8 +84,8 @@ export default function PartyLobby({
           <em>Different screens.</em>
         </h2>
         <p>
-          Create a private room. Share the code. Chat with your crew and start a
-          Neon Dash run together.
+          Create a private room. Share the code. Chat with your crew, race
+          Sunset Circuit together, or launch Neon Dash.
         </p>
         <div className="connection" role="status">
           <span className={`dot ${connected ? "" : "offline"}`} />
@@ -108,7 +113,7 @@ export default function PartyLobby({
           </span>
           <span>
             03 <b>Play</b>
-            <small>Start independent runs together</small>
+            <small>Race on a shared track</small>
           </span>
         </div>
         <p className="party-privacy">
@@ -211,6 +216,44 @@ export default function PartyLobby({
                     </li>
                   ))}
                 </ul>
+                {host && (
+                  <div className="party-race-options">
+                    <label>
+                      Party game{" "}
+                      <select
+                        aria-label="Party game"
+                        value={partyGame}
+                        disabled={pending}
+                        onChange={(e) =>
+                          setPartyGame(e.target.value as typeof partyGame)
+                        }
+                      >
+                        <option value="kart-circuit">
+                          Sunset Circuit · shared race
+                        </option>
+                        <option value="neon-dash">
+                          Neon Dash · independent runs
+                        </option>
+                      </select>
+                    </label>
+                    {partyGame === "kart-circuit" && (
+                      <label>
+                        Track{" "}
+                        <select
+                          aria-label="Party race track"
+                          value={track}
+                          onChange={(e) => setTrack(e.target.value as TrackId)}
+                        >
+                          {TRACKS.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                  </div>
+                )}
                 <div className="party-ready-actions">
                   <button
                     className={self?.ready ? "secondary" : "primary"}
@@ -225,7 +268,9 @@ export default function PartyLobby({
                     <button
                       className="primary"
                       disabled={pending || !connected || !allReady}
-                      onClick={() => action({ action: "start" })}
+                      onClick={() =>
+                        action({ action: "start", game: partyGame, track })
+                      }
                     >
                       Start party run <ArrowRight size={15} />
                     </button>
@@ -239,7 +284,8 @@ export default function PartyLobby({
                     : !allReady
                       ? "Everyone must be connected and ready."
                       : "Ready to go!"}{" "}
-                  Synchronized start · independent Neon Dash runs.
+                  Sunset Circuit uses a shared server-controlled race. Neon Dash
+                  runs are independent.
                 </small>
                 <div className="party-chat">
                   <div className="chat-heading">

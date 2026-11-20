@@ -14,6 +14,7 @@ import GameArtwork from "../components/GameArtwork";
 import { useAccount } from "../components/account/AccountProvider";
 import AccountDialog from "../components/account/AccountDialog";
 import CloudLeaderboard from "../components/account/CloudLeaderboard";
+import type { OnlineRaceLink } from "../lib/use-party";
 import PartyLobby from "../components/PartyLobby";
 import {
   Gamepad2,
@@ -32,6 +33,9 @@ import {
   Joystick,
   Check,
 } from "lucide-react";
+const OnlineKart = dynamic(() => import("../components/OnlineKart"), {
+  ssr: false,
+});
 const NeonDash = dynamic(() => import("../components/NeonDash"), {
   ssr: false,
   loading: () => <div className="modal">Loading game…</div>,
@@ -51,6 +55,7 @@ const categories = [
 ] as const;
 export default function Home() {
   const cloud = useAccount();
+  const [onlineRace, setOnlineRace] = useState<OnlineRaceLink | null>(null);
   const [boardMode, setBoardMode] = useState<"local" | "community">(
     "community",
   );
@@ -289,7 +294,15 @@ export default function Home() {
           name={name}
           onNameChange={setGuestName}
           signedIn={!!cloud.user}
-          onStart={() => setPlaying("neon-dash")}
+          onStart={(race) => {
+            if (race) {
+              setPlaying(null);
+              setOnlineRace(race);
+            } else {
+              setOnlineRace(null);
+              setPlaying("neon-dash");
+            }
+          }}
         />
         <section id="leaderboards" className="leaderboards">
           <div className="section-heading">
@@ -429,6 +442,9 @@ export default function Home() {
           </span>
         </footer>
       </main>
+      {onlineRace && (
+        <OnlineKart link={onlineRace} onClose={() => setOnlineRace(null)} />
+      )}
       {playing === "neon-dash" && (
         <NeonDash
           onClose={() => setPlaying(null)}

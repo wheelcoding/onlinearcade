@@ -1,3 +1,4 @@
+import type { TrackId, Vehicle, RaceInput } from "@onlinearcade/core";
 /** Public wire contract. Resume credentials are sent only to their owner, never in room state. */
 export type PartyPlayer = {
   id: string;
@@ -12,7 +13,29 @@ export type ChatMessage = {
   text: string;
   sentAt: number;
 };
-export type PartySession = { id: string; game: "neon-dash"; startsAt: number };
+export type RaceRoster = { memberId: string; name: string; color: string };
+export type PartySession = {
+  id: string;
+  game: "neon-dash" | "kart-circuit";
+  startsAt: number;
+  track?: TrackId;
+  racers?: RaceRoster[];
+};
+export type RacePacket = {
+  sessionId: string;
+  tick: number;
+  time: number;
+  countdown: number;
+  cars: Vehicle[];
+  withdrawn: number[];
+  complete: boolean;
+};
+export type RaceCommand = {
+  sessionId: string;
+  seq: number;
+  input: RaceInput;
+  recover?: boolean;
+};
 export type PartyState = {
   code: string;
   host: string;
@@ -22,6 +45,8 @@ export type PartyState = {
 };
 export type PartyAction = {
   action: "create" | "join" | "leave" | "ready" | "start" | "chat" | "kick";
+  game?: "neon-dash" | "kart-circuit";
+  track?: TrackId;
   name?: string;
   code?: string;
   ready?: boolean;

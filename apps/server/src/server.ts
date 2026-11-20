@@ -1,3 +1,5 @@
+import { OnlineRace } from "./online-race.js";
+import { TRACK_IDS } from "@onlinearcade/core";
 import { createServer } from "node:http";
 import { randomBytes, randomUUID } from "node:crypto";
 import { Server } from "socket.io";
@@ -11,6 +13,7 @@ type Member = PartyPlayer & {
 type Room = Omit<PartyState, "players"> & {
   players: Member[];
   lastStart: number;
+  race?: OnlineRace;
 };
 type Options = {
   reconnectGraceMs?: number;
@@ -40,6 +43,7 @@ export function createArcadeServer(
           status: "ok",
           service: "onlinearcade-multiplayer",
           version: 2,
+          features: ["shared-kart-racing"],
         }),
       );
     } else {
@@ -71,6 +75,7 @@ export function createArcadeServer(
   const presence = () =>
     io.emit("presence", { online: io.sockets.sockets.size });
   function remove(room: Room, member: Member) {
+    room.race?.exit(member.id);
     clearTimeout(member.expiry);
     credentials.delete(member.token);
     room.players = room.players.filter((p) => p.id !== member.id);
@@ -155,7 +160,11 @@ export function createArcadeServer(
       socket.join(room.code);
       reply({ ok: true, memberId: member.id, resumeToken: member.token });
       update(room);
-      if (room.session && room.session.startsAt > Date.now())
+      if (
+        room.session &&
+        (room.session.startsAt > Date.now() ||
+          (room.race && !room.race.complete))
+      )
         socket.emit("session", room.session);
     });
     socket.on("party:action", (raw, ack) => {
@@ -303,18 +312,89 @@ export function createArcadeServer(
           return reply({
             error: "A run has just started. Wait before starting another.",
           });
+        if (room.race && !room.race.complete)
+          return reply({
+            error: "A race is already running. Finish or leave the race first.",
+          });
+        if (
+          raw.game !== undefined &&
+          !["neon-dash", "kart-circuit"].includes(raw.game)
+        )
+          return reply({ error: "Unknown party game." });
+        if (raw.game === "kart-circuit" && !TRACK_IDS.includes(raw.track))
+          return reply({ error: "Choose a valid racing track." });
+        if (
+          raw.game === "kart-circuit" &&
+          [...rooms.values()].filter((r) => r.race && !r.race.complete)
+            .length >= 12
+        )
+          return reply({
+            error: "Racing servers are busy. Try again shortly.",
+          });
         room.lastStart = now;
         room.session = {
           id: randomUUID(),
-          game: "neon-dash",
+          game: raw.game === "kart-circuit" ? "kart-circuit" : "neon-dash",
+          ...(raw.game === "kart-circuit"
+            ? {
+                track: raw.track,
+                racers: room.players.map((p, i) => ({
+                  memberId: p.id,
+                  name: p.name,
+                  color: [
+                    "#f4a05f",
+                    "#91cdbb",
+                    "#bc9ce1",
+                    "#f0ce80",
+                    "#88b3d8",
+                    "#ef91b6",
+                    "#d0e89a",
+                    "#a0b6fa",
+                  ][i],
+                })),
+              }
+            : {}),
           startsAt: now + 3000,
         };
+        room.race =
+          room.session.game === "kart-circuit"
+            ? new OnlineRace(
+                room.session.id,
+                room.session.track!,
+                room.session.racers!,
+                now,
+              )
+            : undefined;
         room.players.forEach((p) => (p.ready = false));
         update(room);
         io.to(room.code).emit("session", room.session);
         return reply({ ok: true });
       }
       reply({ error: "Unknown action." });
+    });
+    let inputTokens = 45,
+      inputAt = Date.now();
+    socket.on("race:input", (raw) => {
+      const now = Date.now();
+      inputTokens = Math.min(45, inputTokens + (now - inputAt) * 0.035);
+      inputAt = now;
+      if (inputTokens < 1) return;
+      inputTokens--;
+      const { room, member } = current();
+      if (room?.race && member) room.race.command(member.id, raw, now);
+    });
+    socket.on("race:sync", (id) => {
+      const { room, member } = current();
+      // Share the action budget so snapshot requests cannot flood large replies.
+      if (tokens < 1) return;
+      tokens--;
+      if (member && room?.race && room.race.id === id)
+        socket.emit("race:state", room.race.packet());
+    });
+    socket.on("race:exit", (id) => {
+      const { room, member } = current();
+      if (member && room?.race && room.race.id === id)
+        room.race.exit(member.id);
     });
     presence();
     socket.on("disconnect", () => {
@@ -338,7 +418,27 @@ export function createArcadeServer(
       presence();
     });
   });
+  let lastTick = Date.now(),
+    broadcasts = 0;
+  const raceTimer = setInterval(() => {
+    const now = Date.now(),
+      dt = Math.min((now - lastTick) / 1000, 0.25);
+    lastTick = now;
+    broadcasts++;
+    for (const room of rooms.values())
+      if (room.race && !room.race.complete) {
+        room.race.advance(
+          dt,
+          new Set(room.players.filter((p) => p.connected).map((p) => p.id)),
+          now,
+        );
+        if (broadcasts % 4 === 0 || room.race.complete)
+          io.to(room.code).emit("race:state", room.race.packet());
+      }
+  }, 1000 / 60);
+  raceTimer.unref();
   http.once("close", () => {
+    clearInterval(raceTimer);
     for (const room of rooms.values())
       for (const member of room.players) clearTimeout(member.expiry);
     rooms.clear();
