@@ -47,7 +47,12 @@ export function createArcadeServer(
           status: "ok",
           service: "onlinearcade-multiplayer",
           version: 2,
-          features: ["shared-kart-racing", "party-planet", "boostball"],
+          features: [
+            "shared-kart-racing",
+            "party-planet",
+            "boostball",
+            "boostball-3d",
+          ],
         }),
       );
     } else {
@@ -480,6 +485,7 @@ export function createArcadeServer(
       "shared-kart-racing",
       "party-planet",
       "boostball",
+      "boostball-3d",
     ]);
     presence();
     socket.on("disconnect", () => {

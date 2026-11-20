@@ -16,13 +16,13 @@ export const games: GameDefinition[] = [
     id: "boostball",
     title: "Boostball",
     category: "Party Games",
-    type: "2D · TEAM SPORT",
+    type: "3D · TEAM SPORT",
     art: "boostball",
-    tag: "CAR SOCCER",
-    desc: "Boost. Bank. Score. Blue vs orange in a neon car-soccer stadium.",
+    tag: "3D CAR SOCCER",
+    desc: "Jump. Boost. Score. A full 3D stadium. Real aerial challenges.",
     playable: true,
     controls:
-      "WASD / arrows drive · Shift boost · Space dodge · Touch controls",
+      "WASD / arrows drive · Shift boost · Space jump · X dodge · C camera · Touch controls",
     objective:
       "Score more goals in three minutes. Play with 2–8 friends or practice against AI.",
   },

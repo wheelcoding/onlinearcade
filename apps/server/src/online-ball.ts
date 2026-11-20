@@ -28,6 +28,7 @@ export class OnlineBall {
       !raw.input ||
       typeof raw.input.boost !== "boolean" ||
       typeof raw.input.dodge !== "boolean" ||
+      (raw.input.jump !== undefined && typeof raw.input.jump !== "boolean") ||
       !Number.isFinite(raw.input.throttle) ||
       !Number.isFinite(raw.input.steer) ||
       Math.abs(raw.input.throttle) > 1 ||
@@ -42,6 +43,7 @@ export class OnlineBall {
         steer: raw.input.steer,
         boost: raw.input.boost,
         dodge: raw.input.dodge,
+        jump: raw.input.jump === true,
       },
     });
     return true;

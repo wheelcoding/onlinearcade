@@ -255,10 +255,10 @@ export function useParty(onStart: (race?: OnlineRaceLink) => void) {
       if (
         payload.action === "start" &&
         payload.game === "boostball" &&
-        !features.includes("boostball")
+        !features.includes("boostball-3d")
       ) {
         setError(
-          "Boostball needs the latest multiplayer server. In Render, choose Manual Deploy → Deploy latest commit. Practice is available now.",
+          "Boostball 3D needs the latest multiplayer server. In Render, choose Manual Deploy → Deploy latest commit. Practice is available now.",
         );
         return false;
       }
