@@ -98,6 +98,10 @@ export class OnlineRace {
     });
     this.sim.advance(dt, idleInput(), controls);
     this.sim.takeEvents();
+    if (now - this.createdAt >= 600000)
+      this.sim.cars.forEach((car, i) => {
+        if (car.finishedAt === null) this.withdrawn.add(i);
+      });
     this.complete =
       this.sim.cars.every(
         (c, i) => c.finishedAt !== null || this.withdrawn.has(i),

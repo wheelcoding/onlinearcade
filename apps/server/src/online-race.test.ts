@@ -70,4 +70,5 @@ test("first finisher does not stop the other racers; results and expiry are serv
   const expired = new OnlineRace("race", "alpine-pass", roster, 10000);
   expired.advance(0.1, new Set(), 610000);
   assert.equal(expired.complete, true);
+  assert.equal(expired.packet().withdrawn.length, 2);
 });
