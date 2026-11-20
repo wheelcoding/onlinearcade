@@ -86,11 +86,13 @@ export const games: GameDefinition[] = [
     category: "Parkour",
     type: "3D · SOLO",
     art: "cloud",
-    tag: "IN DEVELOPMENT",
-    desc: "The only way is up. A new world is taking shape.",
-    playable: false,
-    controls: "",
-    objective: "",
+    tag: "3 SKY REGIONS",
+    desc: "Double jump. Air dash. Find your footing above the clouds.",
+    playable: true,
+    controls:
+      "WASD / arrows move · Space double jump · Shift / X dash · R checkpoint",
+    objective:
+      "Cross 31 floating islands, find crystals and reach the summit portal.",
   },
   {
     id: "party-planet",
@@ -106,6 +108,6 @@ export const games: GameDefinition[] = [
   },
 ];
 export const rankedGames = games.filter(
-  (g) => g.playable && g.id !== "party-planet",
+  (g) => g.playable && g.id !== "party-planet" && g.id !== "cloudbound",
 );
 export const gameById = (id: string) => games.find((g) => g.id === id)!;
