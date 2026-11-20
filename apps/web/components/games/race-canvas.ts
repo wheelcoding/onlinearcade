@@ -284,7 +284,7 @@ export function createCanvasRace(
         const pose = ghostPose(ghost, sim.time + p.penalty);
         if (pose) car(pose.x, pose.z, pose.heading, "#b5eff1", 0.35);
       }
-      for (const opponent of sim.cars.filter((c) => c.id !== 0))
+      for (const opponent of sim.cars.filter((c) => c.id !== sim.playerId))
         car(opponent.x, opponent.z, opponent.heading, opponent.color);
       if (p.drifting) {
         ctx.fillStyle = p.driftCharge >= 2.3 ? "#ffc88b" : "#9aeee9";

@@ -4261,3 +4261,15 @@ button:active:not(:disabled) {
 .advanced-dialog:fullscreen .puzzle-canvas {
   width: min(100%, 72vh);
 }
+
+.party-race-options { display:grid; gap:12px; margin:18px 0; }
+.party-race-options label { display:grid; gap:8px; }
+.party-race-options select { background:#302922; color:#f7e7ca; border:1px solid #625347; padding:12px; border-radius:10px; max-width:100%; }
+.online-race { max-height:95dvh; overflow:auto; width:min(1150px,96vw); padding:20px; background:#29221e; border-radius:20px; }
+.online-race header,.online-race-hud { display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap; }
+.online-race .kart-canvas { height:clamp(220px,46dvh,480px); width:100%; }
+.online-race-standings { display:flex; gap:10px 32px; flex-wrap:wrap; padding-left:28px; }
+.online-race-touch { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; touch-action:none; }
+.online-race-touch button { touch-action:none; user-select:none; background:#66503d; color:#fff0d5; border:1px solid #b28a62; border-radius:12px; padding:16px; min-width:64px; }
+
+.online-race header { padding:0 0 12px; position:static; background:transparent; }

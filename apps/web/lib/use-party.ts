@@ -47,7 +47,12 @@ export function multiplayerEndpoint(
     return null;
   }
 }
-export function useParty(onStart: () => void) {
+export type OnlineRaceLink = {
+  session: PartySession;
+  socket: Socket;
+  memberId: string;
+};
+export function useParty(onStart: (race?: OnlineRaceLink) => void) {
   const [status, setStatus] = useState<ConnectionState>("connecting"),
     [online, setOnline] = useState<number | null>(null),
     [party, setParty] = useState<PartyState | null>(null),
@@ -55,6 +60,7 @@ export function useParty(onStart: () => void) {
     [error, setError] = useState(""),
     [pending, setPending] = useState(false),
     [notice, setNotice] = useState("");
+  const identity = useRef<string | null>(null);
   const socket = useRef<Socket | null>(null),
     start = useRef(onStart),
     sessionTimer = useRef<ReturnType<typeof setTimeout> | null>(null),
@@ -65,13 +71,17 @@ export function useParty(onStart: () => void) {
     try {
       sessionStorage.removeItem(storageKey.current);
     } catch {}
+    identity.current = null;
     setMemberId(null);
     setParty(null);
     if (sessionTimer.current) clearTimeout(sessionTimer.current);
     setNotice("");
   }, []);
   const remember = useCallback((reply: PartyReply) => {
-    if (reply.memberId) setMemberId(reply.memberId);
+    if (reply.memberId) {
+      identity.current = reply.memberId;
+      setMemberId(reply.memberId);
+    }
     if (reply.resumeToken)
       try {
         sessionStorage.setItem(storageKey.current, reply.resumeToken);
@@ -155,16 +165,31 @@ export function useParty(onStart: () => void) {
     });
     s.on("session", (value: PartySession) => {
       if (
-        value?.game !== "neon-dash" ||
+        !["neon-dash", "kart-circuit"].includes(value?.game) ||
         typeof value.id !== "string" ||
         !Number.isFinite(value.startsAt) ||
-        value.startsAt < Date.now() - 1000 ||
+        (value.game === "neon-dash" && value.startsAt < Date.now() - 1000) ||
         value.startsAt > Date.now() + 10000 ||
         seenSession.current === value.id
       )
         return;
       seenSession.current = value.id;
       if (sessionTimer.current) clearTimeout(sessionTimer.current);
+      if (value.game === "kart-circuit") {
+        if (
+          identity.current &&
+          value.track &&
+          value.racers?.some((p) => p.memberId === identity.current)
+        ) {
+          setNotice("");
+          start.current({
+            session: value,
+            socket: s,
+            memberId: identity.current,
+          });
+        }
+        return;
+      }
       setNotice(
         "Starting Neon Dash together in 3 seconds. Runs are independent.",
       );

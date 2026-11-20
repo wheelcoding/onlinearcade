@@ -134,6 +134,7 @@ export class RaceSimulation {
   readonly cars: Vehicle[];
   readonly mode: RaceMode;
   readonly difficulty: RaceDifficulty;
+  playerId = 0;
   time = 0;
   countdown = 3;
   tick = 0;
@@ -147,6 +148,7 @@ export class RaceSimulation {
     mode: RaceMode = "grand-prix",
     difficulty: RaceDifficulty = "rookie",
     color = "#f4a05f",
+    readonly humans?: readonly { name: string; color: string }[],
   ) {
     this.track = getTrack(trackId);
     this.samples = sampleTrack(this.track);
@@ -156,15 +158,18 @@ export class RaceSimulation {
     const names = ["YOU", "NOVA", "MILO", "RHEA", "ACE"],
       colors = [color, "#91cdbb", "#bc9ce1", "#f0ce80", "#88b3d8"];
     this.cars = Array.from(
-      { length: mode === "grand-prix" ? 5 : 1 },
+      { length: humans?.length ?? (mode === "grand-prix" ? 5 : 1) },
       (_, id) => {
-        const grid = mode === "grand-prix" ? (4 - id) * -0.012 : 0,
+        const grid =
+            mode === "grand-prix"
+              ? ((humans?.length ?? 5) - 1 - id) * -0.012
+              : 0,
           lane = mode === "grand-prix" ? (id % 2 === 0 ? -1 : 1) * 1.7 : 0,
           p = trackPose(this.samples, grid);
         return {
           id,
-          name: names[id],
-          color: colors[id],
+          name: humans?.[id].name ?? names[id],
+          color: humans?.[id].color ?? colors[id],
           x: p.x - p.tz * lane,
           z: p.z + p.tx * lane,
           vx: 0,
@@ -200,7 +205,7 @@ export class RaceSimulation {
     );
   }
   get player() {
-    return this.cars[0];
+    return this.cars[this.playerId];
   }
   get standings() {
     return [...this.cars].sort((a, b) =>
@@ -214,19 +219,23 @@ export class RaceSimulation {
     );
   }
   get position() {
-    return this.standings.findIndex((c) => c.id === 0) + 1;
+    return this.standings.findIndex((c) => c.id === this.playerId) + 1;
   }
-  advance(delta: number, input: RaceInput) {
+  advance(
+    delta: number,
+    input: RaceInput,
+    humanInputs?: ReadonlyMap<number, RaceInput>,
+  ) {
     this.accumulator += clamp(delta, 0, 0.25);
     let steps = 0;
     while (this.accumulator + 1e-9 >= FIXED_STEP && steps < 15) {
-      this.step(input);
+      this.step(input, humanInputs);
       this.accumulator -= FIXED_STEP;
       steps++;
     }
     return steps;
   }
-  step(input: RaceInput) {
+  step(input: RaceInput, humanInputs?: ReadonlyMap<number, RaceInput>) {
     if (this.finished) return;
     const dt = FIXED_STEP;
     this.tick++;
@@ -245,10 +254,20 @@ export class RaceSimulation {
     }
     this.time += dt;
     for (const car of this.cars)
-      this.drive(car, car.id === 0 ? input : this.aiInput(car), dt);
+      this.drive(
+        car,
+        this.humans
+          ? (humanInputs?.get(car.id) ?? idleInput())
+          : car.id === 0
+            ? input
+            : this.aiInput(car),
+        dt,
+      );
     if (this.mode === "grand-prix") this.resolveCars();
     for (const car of this.cars) this.updateProgress(car);
-    if (this.player.finishedAt !== null) this.finish();
+    if (this.humans) {
+      if (this.cars.every((c) => c.finishedAt !== null)) this.finished = true;
+    } else if (this.player.finishedAt !== null) this.finish();
   }
   takeEvents() {
     const events = this.events;
@@ -301,8 +320,9 @@ export class RaceSimulation {
         car.finishedAt === null,
     };
   }
-  recover() {
-    const car = this.player;
+  recover(carId = this.playerId) {
+    const car = this.cars[carId];
+    if (!car || car.finishedAt !== null) return;
     if (this.finished || this.countdown > 0 || car.recovering > 0) return;
     const p = trackPose(this.samples, car.lastGate / CHECKPOINTS + 0.003);
     Object.assign(car, {
@@ -322,9 +342,13 @@ export class RaceSimulation {
     });
     car.penalty += 2;
     car.recoveries++;
-    this.events.push({ type: "recover", carId: 0, value: 2 });
+    this.events.push({ type: "recover", carId, value: 2 });
   }
   private drive(car: Vehicle, raw: RaceInput, dt: number) {
+    if (car.finishedAt !== null) {
+      car.speed = car.vx = car.vz = 0;
+      return;
+    }
     const input = {
       throttle: clamp(raw.throttle, 0, 1),
       brake: clamp(raw.brake, 0, 1),

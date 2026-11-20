@@ -107,3 +107,9 @@ Only finished runs submit scores. The existing Supabase migration remains compat
 ### Neon Dash stability fixes
 
 Spike rendering and collision now share the same two-spike geometry. Collision follows the triangular silhouette with a small forgiveness margin, so empty corners beside a spike's tip cannot damage the runner. Jump height is consistent, rapid taps queue individually, and keyboard/canvas/touch inputs no longer cancel one another. Pause and focus loss clear queued input. The runner stays visible during damage protection, with reduced shake. City windows/buildings are baked into three scrolling textures instead of rebuilt every frame; textures are cleaned up on restart and close.
+
+### Shared Sunset Circuit races
+
+Create a party, invite up to seven friends, choose **Sunset Circuit** and one of the four tracks, then have everyone ready up. The host starts one shared three-lap race. All karts are real party members; the Node server runs physics, collisions, boost, checkpoint validation and finish timing at 60 Hz, with room-only snapshots at 15 Hz and interpolated rendering. Keyboard and mobile controls send bounded inputs at 30 Hz, never positions or scores. Recovering adds two seconds. The race continues when a tab loses focus; stale/disconnected controls stop accelerating after 300 ms. Brief disconnections can resume through the existing party token; explicitly returning to the party withdraws an unfinished kart. Races expire after ten minutes. Online race results are party-local and do not enter solo careers or cloud leaderboards.
+
+The server build bundles the shared TypeScript physics with esbuild so Render runs plain Node.js without a TypeScript runtime. The free Render instance holds rooms and races in memory; deployments clear active races. At most 12 races run concurrently per server instance. Shared racing requires the updated server (the health response includes `shared-kart-racing` in `features`).

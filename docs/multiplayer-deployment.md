@@ -48,6 +48,8 @@ If someone else is helping with setup, send them just the public Render URL. Do 
 
 Server-validated names, codes, capacity, room membership, host permissions, ready checks, private chat (300 characters, last 50 messages), connection limits, per-socket action limits and a separate chat throttle. Resume tokens are random, owner-only, never exposed in public party state, invalidated on leave/kick, and stored in tab session storage. Display names are guest labels, not verified account identities. Chat is rendered as plain text; no raw HTML or automatic link execution.
 
-The party start is a synchronized launch of **independent** Neon Dash games. Shared racing/player movement and verified competitive party scoring are not implemented. This service doesn't claim those features exist.
+The host can choose **Sunset Circuit** and a track for a shared server-controlled race, or **Neon Dash** for synchronized independent runs. Sunset Circuit has real remote karts, authoritative handling/collisions/checkpoints, live standings, finish times and disconnect handling. All members must ready up. Return to the party to withdraw; completed results stay in that party and are excluded from solo/cloud rankings. Verified cross-device competitive party scoring is not implemented.
+
+After deploying the shared-racing update, `/health` includes `"features":["shared-kart-racing"]`. Both Render and GitHub Pages must deploy the current `main` commit. Render's Blueprint runs `npm ci --include=dev` and bundles the shared physics using esbuild. A restart clears active races.
 
 Local development: `npm install && npm run dev`. Local server origin defaults to `http://localhost:3000`; frontend defaults to `http://localhost:3001`. Production startup rejects the localhost origin default. The Render blueprint sets `TRUST_PROXY=true` for forwarded client-IP connection limits; do not enable it when directly exposing an untrusted proxy path.
