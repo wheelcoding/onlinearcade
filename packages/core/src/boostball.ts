@@ -234,7 +234,7 @@ export class BoostballSimulation {
         if (v < 0) {
           b.vz = Math.max(
             b.vz,
-            Math.min(240, 35 + Math.abs(v) * 0.18 + Math.max(0, c.vz) * 0.65),
+            Math.min(240, 45 + Math.abs(v) * 0.23 + Math.max(0, c.vz) * 0.65),
           );
           b.vx -= 1.8 * v * nx;
           b.vy -= 1.8 * v * ny;
@@ -276,12 +276,20 @@ export function boostballBot(state: BallState, id: string): BallInput {
   if (!bot || !bot.active) return BALL_IDLE;
   const b = state.ball,
     goalX = bot.team ? 0 : 960;
-  const distance = Math.hypot(goalX - b.x, 270 - b.y) || 1;
+  const blocker = state.cars.find(
+    (c) =>
+      c.active &&
+      c.team !== bot.team &&
+      (c.x - b.x) * (goalX - b.x) > 0 &&
+      Math.abs(c.y - b.y) < 45,
+  );
+  const goalY = blocker ? (blocker.y >= 270 ? 230 : 310) : 270;
+  const distance = Math.hypot(goalX - b.x, goalY - b.y) || 1;
   const nx = (goalX - b.x) / distance,
-    ny = (270 - b.y) / distance;
+    ny = (goalY - b.y) / distance;
   const dx = b.x - bot.x,
     dy = b.y - bot.y;
-  const attacking = dx * nx + dy * ny > 20 && Math.abs(dx * ny - dy * nx) < 26;
+  const attacking = dx * nx + dy * ny > 20 && Math.abs(dx * ny - dy * nx) < 12;
   const tx = attacking ? b.x + nx * 70 : clamp(b.x - nx * 90, 65, 895);
   const ty = attacking ? b.y + ny * 70 : clamp(b.y - ny * 90, 65, 475);
   let angle = Math.atan2(ty - bot.y, tx - bot.x) - bot.angle;

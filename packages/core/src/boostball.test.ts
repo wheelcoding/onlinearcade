@@ -193,3 +193,11 @@ test("airborne cars clear grounded opponents and share identical jump trajectori
   assert.equal(a.x, b.x);
   assert.equal(a.y, b.y);
 });
+
+test("practice AI picks a shooting lane and can chip past a parked central defender", () => {
+  const s = new BoostballSimulation(roster);
+  for (let i = 0; i < 120 * 60 && s.state.score[1] === 0; i++)
+    s.advance(1 / 120, new Map([["b", boostballBot(s.state, "b")]]));
+  assert.ok(s.state.score[1] > 0);
+  assert.equal(s.state.score[0], 0);
+});
