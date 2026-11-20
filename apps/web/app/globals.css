@@ -4286,4 +4286,12 @@ button:active:not(:disabled) {
 .planet-round-cards article {padding:18px;background:#3c334b;border:1px solid #6c587c;border-radius:16px;}
 .planet-welcome {text-align:center;padding:20px 0;}.planet-welcome button {margin:8px;}.planet-orbit {font-size:64px;color:#f0cd80;}
 .planet-safe {border:3px solid;padding:8px 14px;border-radius:12px;background:#17182f;}
+.grubhub-ad {display:flex;align-items:center;justify-content:space-between;gap:28px;margin:32px 0;padding:30px;border:1px solid #b2774e;border-radius:22px;background:linear-gradient(120deg,#493025,#2d2520);}
+.grubhub-ad .eyebrow {color:#e9c8aa;font-size:10px;}
+.grubhub-ad-brand {margin:10px 0 6px;color:#ffa066;font-size:20px;font-weight:800;}
+.grubhub-ad h2 {max-width:650px;margin:0;color:#fff0d8;font-size:clamp(20px,2.3vw,29px);line-height:1.3;}
+.grubhub-ad-link {display:inline-flex;align-items:center;justify-content:center;gap:10px;flex-shrink:0;padding:15px 20px;border-radius:12px;background:#ffc18c;color:#2b1b12;font-weight:800;text-decoration:none;transition:background .2s;}
+.grubhub-ad-link:hover {background:#ffdab8;}
+.grubhub-ad-link:focus-visible {outline:3px solid #fff0d8;outline-offset:5px;}
+@media(max-width:700px){.grubhub-ad{align-items:flex-start;flex-direction:column;padding:22px;gap:20px;}.grubhub-ad-link{width:100%;}}
 @media(max-width:600px){.planet-round-cards{grid-template-columns:1fr;}.planet-welcome{padding:0;}.planet-status strong{font-size:16px;}.planet-controls button{padding:12px 20px;}}

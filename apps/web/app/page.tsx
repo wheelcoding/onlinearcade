@@ -300,6 +300,22 @@ export default function Home() {
             <span>Stay for one more round. ↗</span>
           </p>
         </section>
+        <aside className="grubhub-ad" aria-label="Grubhub referral advertisement">
+          <div className="grubhub-ad-copy">
+            <span className="eyebrow">AD · REFERRAL LINK</span>
+            <p className="grubhub-ad-brand">Grubhub</p>
+            <h2>Get $10 off when you place your first Grubhub order</h2>
+          </div>
+          <a
+            className="grubhub-ad-link"
+            href="https://www.grubhub.com/referral/6c6f84c0-c2ab-11f1-a795-f3639ed6276f"
+            target="_blank"
+            rel="sponsored noopener noreferrer"
+          >
+            Click to get $10 off <ArrowUpRight size={20} aria-hidden="true" />
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        </aside>
         <PartyLobby
           name={name}
           onNameChange={setGuestName}
