@@ -53,3 +53,7 @@ The host can choose **Sunset Circuit** and a track for a shared server-controlle
 After deploying the shared-racing update, `/health` includes `"features":["shared-kart-racing"]`. Both Render and GitHub Pages must deploy the current `main` commit. Render's Blueprint runs `npm ci --include=dev` and bundles the shared physics using esbuild. A restart clears active races.
 
 Local development: `npm install && npm run dev`. Local server origin defaults to `http://localhost:3000`; frontend defaults to `http://localhost:3001`. Production startup rejects the localhost origin default. The Render blueprint sets `TRUST_PROXY=true` for forwarded client-IP connection limits; do not enable it when directly exposing an untrusted proxy path.
+
+## Party Planet deployment
+
+Deploy the latest `main` in Render as well as Pages. `/health` must include `party-planet` in `features`. Until that server is deployed, the lobby disables Party Planet starts with a clear update message; the library still offers playable solo practice. Once updated, create a party, choose Party Planet, ready everyone and start the shared three-round match. All scores are calculated by the server and remain party-local.

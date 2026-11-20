@@ -98,12 +98,14 @@ export const games: GameDefinition[] = [
     category: "Party Games",
     type: "2D · MULTIPLAYER",
     art: "party",
-    tag: "IN DEVELOPMENT",
-    desc: "Small games. Big friendships. Coming later.",
-    playable: false,
-    controls: "",
-    objective: "",
+    tag: "3 MINI-GAMES",
+    desc: "Grab stars. Dodge meteors. Find your color. Party with friends or practice solo.",
+    playable: true,
+    controls: "WASD / arrows or touch directions to move",
+    objective: "Three rounds. One party champion. Scores stay in the party.",
   },
 ];
-export const playableGames = games.filter((g) => g.playable);
+export const rankedGames = games.filter(
+  (g) => g.playable && g.id !== "party-planet",
+);
 export const gameById = (id: string) => games.find((g) => g.id === id)!;

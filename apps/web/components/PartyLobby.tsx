@@ -26,13 +26,18 @@ export default function PartyLobby({
 }) {
   const lobby = useParty(onStart),
     { party, status, online, memberId, pending, action } = lobby;
-  const [partyGame, setPartyGame] = useState<"neon-dash" | "kart-circuit">(
-      "kart-circuit",
-    ),
+  const [partyGame, setPartyGame] = useState<
+      "neon-dash" | "kart-circuit" | "party-planet"
+    >("kart-circuit"),
     [track, setTrack] = useState<TrackId>("sunset-bay"),
     [code, setCode] = useState(""),
     [copied, setCopied] = useState(false),
     [draft, setDraft] = useState("");
+  useEffect(() => {
+    const select = () => setPartyGame("party-planet");
+    window.addEventListener("oa:party-planet", select);
+    return () => window.removeEventListener("oa:party-planet", select);
+  }, []);
   const messages = useRef<HTMLDivElement>(null),
     copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -231,6 +236,9 @@ export default function PartyLobby({
                         <option value="kart-circuit">
                           Sunset Circuit · shared race
                         </option>
+                        <option value="party-planet">
+                          Party Planet · three mini-games
+                        </option>
                         <option value="neon-dash">
                           Neon Dash · independent runs
                         </option>
@@ -254,6 +262,15 @@ export default function PartyLobby({
                     )}
                   </div>
                 )}
+                {host &&
+                  partyGame === "party-planet" &&
+                  !lobby.features.includes("party-planet") && (
+                    <p role="status">
+                      Party Planet is waiting for the server update. Deploy the
+                      latest commit in Render. Solo practice is available from
+                      the game library.
+                    </p>
+                  )}
                 <div className="party-ready-actions">
                   <button
                     className={self?.ready ? "secondary" : "primary"}
@@ -267,7 +284,13 @@ export default function PartyLobby({
                   {host ? (
                     <button
                       className="primary"
-                      disabled={pending || !connected || !allReady}
+                      disabled={
+                        pending ||
+                        !connected ||
+                        !allReady ||
+                        (partyGame === "party-planet" &&
+                          !lobby.features.includes("party-planet"))
+                      }
                       onClick={() =>
                         action({ action: "start", game: partyGame, track })
                       }

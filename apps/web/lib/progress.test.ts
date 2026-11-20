@@ -1,5 +1,35 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';
-import {BrowserProgressRepository} from './progress';import {recordRun,GAME_IDS} from '@onlinearcade/core';import {playableGames} from './catalog';
-const store=()=>{const values=new Map<string,string>();return {getItem:(key:string)=>values.get(key)||null,setItem:(key:string,value:string)=>{values.set(key,value);}} as Storage;};
-test('repository migrates legacy records and persists all new games without conflating them',()=>{const storage=store();storage.setItem('oa-records',JSON.stringify({best:20,runs:1,total:20}));const repo=new BrowserProgressRepository(storage);repo.save(recordRun(repo.load(),'sunset-circuit',7000));assert.equal(repo.load().games['neon-dash']?.best,20);assert.equal(repo.load().games['sunset-circuit']?.best,7000);assert.equal(storage.getItem('oa-records'),'{"best":20,"runs":1,"total":20}');});
-test('bad storage recovers and every playable catalog entry has a stable record ID',()=>{const storage=store();storage.setItem('oa-progress-v2','{broken');assert.deepEqual(new BrowserProgressRepository(storage).load().games,{});assert.deepEqual(playableGames.map(g=>g.id).sort(),[...GAME_IDS].sort());});
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { BrowserProgressRepository } from "./progress";
+import { recordRun, GAME_IDS } from "@onlinearcade/core";
+import { rankedGames } from "./catalog";
+const store = () => {
+  const values = new Map<string, string>();
+  return {
+    getItem: (key: string) => values.get(key) || null,
+    setItem: (key: string, value: string) => {
+      values.set(key, value);
+    },
+  } as Storage;
+};
+test("repository migrates legacy records and persists all new games without conflating them", () => {
+  const storage = store();
+  storage.setItem(
+    "oa-records",
+    JSON.stringify({ best: 20, runs: 1, total: 20 }),
+  );
+  const repo = new BrowserProgressRepository(storage);
+  repo.save(recordRun(repo.load(), "sunset-circuit", 7000));
+  assert.equal(repo.load().games["neon-dash"]?.best, 20);
+  assert.equal(repo.load().games["sunset-circuit"]?.best, 7000);
+  assert.equal(
+    storage.getItem("oa-records"),
+    '{"best":20,"runs":1,"total":20}',
+  );
+});
+test("bad storage recovers and every ranked catalog entry has a stable record ID", () => {
+  const storage = store();
+  storage.setItem("oa-progress-v2", "{broken");
+  assert.deepEqual(new BrowserProgressRepository(storage).load().games, {});
+  assert.deepEqual(rankedGames.map((g) => g.id).sort(), [...GAME_IDS].sort());
+});

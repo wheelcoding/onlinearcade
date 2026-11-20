@@ -59,7 +59,8 @@ export function useParty(onStart: (race?: OnlineRaceLink) => void) {
     [memberId, setMemberId] = useState<string | null>(null),
     [error, setError] = useState(""),
     [pending, setPending] = useState(false),
-    [notice, setNotice] = useState("");
+    [notice, setNotice] = useState(""),
+    [features, setFeatures] = useState<string[]>([]);
   const identity = useRef<string | null>(null);
   const socket = useRef<Socket | null>(null),
     start = useRef(onStart),
@@ -106,6 +107,10 @@ export function useParty(onStart: (race?: OnlineRaceLink) => void) {
       randomizationFactor: 0.3,
     });
     socket.current = s;
+    s.on("capabilities", (value) => {
+      if (Array.isArray(value))
+        setFeatures(value.filter((v) => typeof v === "string"));
+    });
     s.on("connect", () => {
       setStatus("connected");
       setError("");
@@ -134,6 +139,7 @@ export function useParty(onStart: (race?: OnlineRaceLink) => void) {
       setOnline(null);
     });
     s.on("disconnect", () => {
+      setFeatures([]);
       setStatus("reconnecting");
       setOnline(null);
       setPending(false);
@@ -165,7 +171,7 @@ export function useParty(onStart: (race?: OnlineRaceLink) => void) {
     });
     s.on("session", (value: PartySession) => {
       if (
-        !["neon-dash", "kart-circuit"].includes(value?.game) ||
+        !["neon-dash", "kart-circuit", "party-planet"].includes(value?.game) ||
         typeof value.id !== "string" ||
         !Number.isFinite(value.startsAt) ||
         (value.game === "neon-dash" && value.startsAt < Date.now() - 1000) ||
@@ -175,10 +181,10 @@ export function useParty(onStart: (race?: OnlineRaceLink) => void) {
         return;
       seenSession.current = value.id;
       if (sessionTimer.current) clearTimeout(sessionTimer.current);
-      if (value.game === "kart-circuit") {
+      if (value.game === "kart-circuit" || value.game === "party-planet") {
         if (
           identity.current &&
-          value.track &&
+          (value.game === "party-planet" || value.track) &&
           value.racers?.some((p) => p.memberId === identity.current)
         ) {
           setNotice("");
@@ -224,6 +230,16 @@ export function useParty(onStart: (race?: OnlineRaceLink) => void) {
   const action = useCallback(
     async (payload: PartyAction) => {
       const s = socket.current;
+      if (
+        payload.action === "start" &&
+        payload.game === "party-planet" &&
+        !features.includes("party-planet")
+      ) {
+        setError(
+          "Party Planet needs the latest server update. In Render, choose Manual Deploy → Deploy latest commit. Solo practice is available now.",
+        );
+        return false;
+      }
       if (!s?.connected) {
         setError(
           "The party server is reconnecting. Please wait, then try again.",
@@ -252,7 +268,7 @@ export function useParty(onStart: (race?: OnlineRaceLink) => void) {
         );
       });
     },
-    [remember, clearSession],
+    [remember, clearSession, features],
   );
   const reconnect = () => {
     const s = socket.current;
@@ -263,6 +279,7 @@ export function useParty(onStart: (race?: OnlineRaceLink) => void) {
   };
   return {
     status,
+    features,
     online,
     party,
     memberId,

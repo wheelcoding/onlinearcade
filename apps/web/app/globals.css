@@ -4273,3 +4273,17 @@ button:active:not(:disabled) {
 .online-race-touch button { touch-action:none; user-select:none; background:#66503d; color:#fff0d5; border:1px solid #b28a62; border-radius:12px; padding:16px; min-width:64px; }
 
 .online-race header { padding:0 0 12px; position:static; background:transparent; }
+
+.planet-dialog { width:min(1080px,96vw); }
+.planet-canvas { width:100%; aspect-ratio:16/9; max-height:54dvh; background:#11172e; border-radius:18px; overflow:hidden; }
+.planet-status,.planet-scores,.planet-controls {display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:12px 0;}
+.planet-status strong {color:#f0d79c;font-size:20px;}
+.planet-scores {list-style:none;padding:0;justify-content:flex-start;}
+.planet-scores li {background:#40354a;padding:8px 12px;border-radius:10px;}
+.planet-controls {justify-content:center;touch-action:none;}
+.planet-controls button {touch-action:none;user-select:none;border-radius:12px;padding:12px 24px;background:#605274;color:#fff1cd;font-size:24px;}
+.planet-round-cards {display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0;}
+.planet-round-cards article {padding:18px;background:#3c334b;border:1px solid #6c587c;border-radius:16px;}
+.planet-welcome {text-align:center;padding:20px 0;}.planet-welcome button {margin:8px;}.planet-orbit {font-size:64px;color:#f0cd80;}
+.planet-safe {border:3px solid;padding:8px 14px;border-radius:12px;background:#17182f;}
+@media(max-width:600px){.planet-round-cards{grid-template-columns:1fr;}.planet-welcome{padding:0;}.planet-status strong{font-size:16px;}.planet-controls button{padding:12px 20px;}}

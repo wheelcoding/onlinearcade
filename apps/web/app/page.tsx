@@ -8,7 +8,7 @@ import {
   type GameId,
   type LocalProgress,
 } from "@onlinearcade/core";
-import { games, gameById, playableGames } from "../lib/catalog";
+import { games, gameById, rankedGames } from "../lib/catalog";
 import { BrowserProgressRepository } from "../lib/progress";
 import GameArtwork from "../components/GameArtwork";
 import { useAccount } from "../components/account/AccountProvider";
@@ -33,6 +33,9 @@ import {
   Joystick,
   Check,
 } from "lucide-react";
+const PartyPlanet = dynamic(() => import("../components/PartyPlanet"), {
+  ssr: false,
+});
 const OnlineKart = dynamic(() => import("../components/OnlineKart"), {
   ssr: false,
 });
@@ -55,6 +58,7 @@ const categories = [
 ] as const;
 export default function Home() {
   const cloud = useAccount();
+  const [planetOpen, setPlanetOpen] = useState(false);
   const [onlineRace, setOnlineRace] = useState<OnlineRaceLink | null>(null);
   const [boardMode, setBoardMode] = useState<"local" | "community">(
     "community",
@@ -150,7 +154,7 @@ export default function Home() {
               <span className="spark">✳</span>
             </h1>
             <p>
-              Your arcade. Your friends. Your games. Five original worlds, one
+              Your arcade. Your friends. Your games. Six original worlds, one
               more round.
             </p>
             <div className="hero-actions">
@@ -260,12 +264,18 @@ export default function Home() {
                   <div className="game-footer">
                     <span>
                       {g.playable
-                        ? "↗ Chase your personal best"
+                        ? g.id === "party-planet"
+                          ? "↗ Practice or play with friends"
+                          : "↗ Chase your personal best"
                         : "Something good is on the way"}
                     </span>
                     {g.playable ? (
                       <button
-                        onClick={() => setPlaying(g.id as GameId)}
+                        onClick={() =>
+                          g.id === "party-planet"
+                            ? setPlanetOpen(true)
+                            : setPlaying(g.id as GameId)
+                        }
                         aria-label={`Play ${g.title}`}
                       >
                         Play <ArrowUpRight size={16} />
@@ -286,7 +296,7 @@ export default function Home() {
             </div>
           )}
           <p className="library-note">
-            Five playable originals. Fresh challenges. No downloads.{" "}
+            Six playable originals. Fresh challenges. No downloads.{" "}
             <span>Stay for one more round. ↗</span>
           </p>
         </section>
@@ -362,7 +372,7 @@ export default function Home() {
             </div>
           )}
           <div className="board-filters" aria-label="Leaderboard game">
-            {playableGames.map((g) => (
+            {rankedGames.map((g) => (
               <button
                 key={g.id}
                 aria-pressed={boardGame === g.id}
@@ -442,7 +452,25 @@ export default function Home() {
           </span>
         </footer>
       </main>
-      {onlineRace && (
+      {(planetOpen || onlineRace?.session.game === "party-planet") && (
+        <PartyPlanet
+          link={
+            onlineRace?.session.game === "party-planet" ? onlineRace : undefined
+          }
+          onClose={() => {
+            setPlanetOpen(false);
+            setOnlineRace(null);
+          }}
+          onFriends={() => {
+            setPlanetOpen(false);
+            window.dispatchEvent(new Event("oa:party-planet"));
+            document
+              .getElementById("multiplayer")
+              ?.scrollIntoView({ behavior: "smooth" });
+          }}
+        />
+      )}
+      {onlineRace && onlineRace.session.game !== "party-planet" && (
         <OnlineKart link={onlineRace} onClose={() => setOnlineRace(null)} />
       )}
       {playing === "neon-dash" && (
