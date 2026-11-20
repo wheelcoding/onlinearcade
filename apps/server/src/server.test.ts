@@ -361,3 +361,57 @@ test("shared kart races require host/ready checks and isolate snapshots and cont
     await f.close();
   }
 });
+test("Party Planet launches one shared match, isolates room snapshots and accepts only owned controls", async () => {
+  const f = await fixture();
+  try {
+    const a = await f.client(),
+      b = await f.client(),
+      other = await f.client();
+    const { state: room } = await f.create(a, "Alex");
+    await f.action(b, { action: "join", name: "Sam", code: room.code });
+    await f.action(a, { action: "ready", ready: true });
+    await f.action(b, { action: "ready", ready: true });
+    assert.match(
+      (await f.action(b, { action: "start", game: "party-planet" })).error!,
+      /host/,
+    );
+    const session = event(a, "session");
+    assert.ok(
+      (await f.action(a, { action: "start", game: "party-planet" })).ok,
+    );
+    const started = await session;
+    assert.equal(started.game, "party-planet");
+    assert.equal(started.racers.length, 2);
+    let leaked = false;
+    other.on("planet:state", () => (leaked = true));
+    other.emit("planet:sync", started.id);
+    const received = event<any>(b, "planet:state");
+    b.emit("planet:sync", started.id);
+    assert.equal((await received).players.length, 2);
+    const packets: any[] = [];
+    a.on("planet:state", (p) => packets.push(p));
+    const controls = setInterval(
+      () =>
+        a.emit("planet:input", {
+          sessionId: started.id,
+          seq: Date.now(),
+          input: { x: 1, y: 0 },
+          score: 99999,
+        }),
+      40,
+    );
+    try {
+      await new Promise((r) => setTimeout(r, 3400));
+    } finally {
+      clearInterval(controls);
+    }
+    assert.ok(packets.at(-1).players[0].x > 210);
+    assert.equal(packets.at(-1).players[1].x, 385);
+    assert.equal(leaked, false);
+    const left = event<any>(a, "planet:state");
+    b.emit("planet:exit", started.id);
+    assert.equal((await left).players[1].active, false);
+  } finally {
+    await f.close();
+  }
+});

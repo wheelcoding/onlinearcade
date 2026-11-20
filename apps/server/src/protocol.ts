@@ -16,7 +16,7 @@ export type ChatMessage = {
 export type RaceRoster = { memberId: string; name: string; color: string };
 export type PartySession = {
   id: string;
-  game: "neon-dash" | "kart-circuit";
+  game: "neon-dash" | "kart-circuit" | "party-planet";
   startsAt: number;
   track?: TrackId;
   racers?: RaceRoster[];
@@ -45,7 +45,7 @@ export type PartyState = {
 };
 export type PartyAction = {
   action: "create" | "join" | "leave" | "ready" | "start" | "chat" | "kick";
-  game?: "neon-dash" | "kart-circuit";
+  game?: "neon-dash" | "kart-circuit" | "party-planet";
   track?: TrackId;
   name?: string;
   code?: string;

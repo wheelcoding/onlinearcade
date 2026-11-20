@@ -1,3 +1,4 @@
+import { OnlinePlanet } from "./online-planet.js";
 import { OnlineRace } from "./online-race.js";
 import { TRACK_IDS } from "@onlinearcade/core";
 import { createServer } from "node:http";
@@ -14,6 +15,7 @@ type Room = Omit<PartyState, "players"> & {
   players: Member[];
   lastStart: number;
   race?: OnlineRace;
+  planet?: OnlinePlanet;
 };
 type Options = {
   reconnectGraceMs?: number;
@@ -43,7 +45,7 @@ export function createArcadeServer(
           status: "ok",
           service: "onlinearcade-multiplayer",
           version: 2,
-          features: ["shared-kart-racing"],
+          features: ["shared-kart-racing", "party-planet"],
         }),
       );
     } else {
@@ -76,6 +78,7 @@ export function createArcadeServer(
     io.emit("presence", { online: io.sockets.sockets.size });
   function remove(room: Room, member: Member) {
     room.race?.exit(member.id);
+    room.planet?.exit(member.id);
     clearTimeout(member.expiry);
     credentials.delete(member.token);
     room.players = room.players.filter((p) => p.id !== member.id);
@@ -163,7 +166,8 @@ export function createArcadeServer(
       if (
         room.session &&
         (room.session.startsAt > Date.now() ||
-          (room.race && !room.race.complete))
+          (room.race && !room.race.complete) ||
+          (room.planet && !room.planet.complete))
       )
         socket.emit("session", room.session);
     });
@@ -312,32 +316,43 @@ export function createArcadeServer(
           return reply({
             error: "A run has just started. Wait before starting another.",
           });
-        if (room.race && !room.race.complete)
+        if (
+          (room.race && !room.race.complete) ||
+          (room.planet && !room.planet.complete)
+        )
           return reply({
-            error: "A race is already running. Finish or leave the race first.",
+            error:
+              "A match is already running. Finish or leave the match first.",
           });
         if (
           raw.game !== undefined &&
-          !["neon-dash", "kart-circuit"].includes(raw.game)
+          !["neon-dash", "kart-circuit", "party-planet"].includes(raw.game)
         )
           return reply({ error: "Unknown party game." });
         if (raw.game === "kart-circuit" && !TRACK_IDS.includes(raw.track))
           return reply({ error: "Choose a valid racing track." });
         if (
-          raw.game === "kart-circuit" &&
-          [...rooms.values()].filter((r) => r.race && !r.race.complete)
-            .length >= 12
+          (raw.game === "kart-circuit" || raw.game === "party-planet") &&
+          [...rooms.values()].filter(
+            (r) =>
+              (r.race && !r.race.complete) || (r.planet && !r.planet.complete),
+          ).length >= 12
         )
           return reply({
-            error: "Racing servers are busy. Try again shortly.",
+            error: "Game servers are busy. Try again shortly.",
           });
         room.lastStart = now;
         room.session = {
           id: randomUUID(),
-          game: raw.game === "kart-circuit" ? "kart-circuit" : "neon-dash",
-          ...(raw.game === "kart-circuit"
+          game:
+            raw.game === "party-planet"
+              ? "party-planet"
+              : raw.game === "kart-circuit"
+                ? "kart-circuit"
+                : "neon-dash",
+          ...(raw.game === "kart-circuit" || raw.game === "party-planet"
             ? {
-                track: raw.track,
+                ...(raw.game === "kart-circuit" ? { track: raw.track } : {}),
                 racers: room.players.map((p, i) => ({
                   memberId: p.id,
                   name: p.name,
@@ -364,6 +379,10 @@ export function createArcadeServer(
                 room.session.racers!,
                 now,
               )
+            : undefined;
+        room.planet =
+          room.session.game === "party-planet"
+            ? new OnlinePlanet(room.session.id, room.session.racers!)
             : undefined;
         room.players.forEach((p) => (p.ready = false));
         update(room);
@@ -396,6 +415,28 @@ export function createArcadeServer(
       if (member && room?.race && room.race.id === id)
         room.race.exit(member.id);
     });
+    socket.on("planet:input", (raw) => {
+      const now = Date.now();
+      inputTokens = Math.min(45, inputTokens + (now - inputAt) * 0.035);
+      inputAt = now;
+      if (inputTokens < 1) return;
+      inputTokens--;
+      const { room, member } = current();
+      if (room?.planet && member) room.planet.command(member.id, raw, now);
+    });
+    socket.on("planet:sync", (id) => {
+      if (tokens < 1) return;
+      tokens--;
+      const { room, member } = current();
+      if (member && room?.planet && room.planet.id === id)
+        socket.emit("planet:state", room.planet.packet());
+    });
+    socket.on("planet:exit", (id) => {
+      const { room, member } = current();
+      if (member && room?.planet && room.planet.id === id)
+        room.planet.exit(member.id);
+    });
+    socket.emit("capabilities", ["shared-kart-racing", "party-planet"]);
     presence();
     socket.on("disconnect", () => {
       ips.set(socket.data.ip, Math.max(0, (ips.get(socket.data.ip) || 1) - 1));
@@ -425,7 +466,16 @@ export function createArcadeServer(
       dt = Math.min((now - lastTick) / 1000, 0.25);
     lastTick = now;
     broadcasts++;
-    for (const room of rooms.values())
+    for (const room of rooms.values()) {
+      if (room.planet && !room.planet.complete) {
+        room.planet.advance(
+          dt,
+          new Set(room.players.filter((p) => p.connected).map((p) => p.id)),
+          now,
+        );
+        if (broadcasts % 4 === 0 || room.planet.complete)
+          io.to(room.code).emit("planet:state", room.planet.packet());
+      }
       if (room.race && !room.race.complete) {
         room.race.advance(
           dt,
@@ -435,6 +485,7 @@ export function createArcadeServer(
         if (broadcasts % 4 === 0 || room.race.complete)
           io.to(room.code).emit("race:state", room.race.packet());
       }
+    }
   }, 1000 / 60);
   raceTimer.unref();
   http.once("close", () => {
