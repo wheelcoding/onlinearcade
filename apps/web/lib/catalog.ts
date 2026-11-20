@@ -1,6 +1,6 @@
 import type { GameId } from "@onlinearcade/core";
 export type GameDefinition = {
-  id: GameId | "cloudbound" | "party-planet";
+  id: GameId | "cloudbound" | "party-planet" | "boostball";
   title: string;
   category: string;
   type: string;
@@ -12,6 +12,20 @@ export type GameDefinition = {
   objective: string;
 };
 export const games: GameDefinition[] = [
+  {
+    id: "boostball",
+    title: "Boostball",
+    category: "Party Games",
+    type: "2D · TEAM SPORT",
+    art: "boostball",
+    tag: "CAR SOCCER",
+    desc: "Boost. Bank. Score. Blue vs orange in a neon car-soccer stadium.",
+    playable: true,
+    controls:
+      "WASD / arrows drive · Shift boost · Space dodge · Touch controls",
+    objective:
+      "Score more goals in three minutes. Play with 2–8 friends or practice against AI.",
+  },
   {
     id: "neon-dash",
     title: "Neon Dash",
@@ -108,6 +122,10 @@ export const games: GameDefinition[] = [
   },
 ];
 export const rankedGames = games.filter(
-  (g) => g.playable && g.id !== "party-planet" && g.id !== "cloudbound",
+  (g) =>
+    g.playable &&
+    g.id !== "boostball" &&
+    g.id !== "party-planet" &&
+    g.id !== "cloudbound",
 );
 export const gameById = (id: string) => games.find((g) => g.id === id)!;

@@ -56,7 +56,118 @@ export default function GameArtwork({ game }: { game: GameDefinition }) {
           opacity={0.2 + (i % 3) * 0.15}
         />
       ))}
-      {kind === "racing" ? (
+      {kind === "boostball" ? (
+        <g>
+          <rect
+            x="32"
+            y="55"
+            width="576"
+            height="285"
+            rx="30"
+            fill="#183744"
+            stroke="#66c9dc"
+            strokeWidth="3"
+          />
+          {Array.from({ length: 10 }, (_, i) => (
+            <rect
+              key={i}
+              x={40 + i * 56}
+              y="65"
+              width="28"
+              height="265"
+              fill="#72bab6"
+              opacity=".07"
+            />
+          ))}
+          <path
+            d="M320 58V338 M35 145H140V250H35 M605 145H500V250H605"
+            fill="none"
+            stroke="#b4e1d4"
+            opacity=".4"
+            strokeWidth="3"
+          />
+          <circle
+            cx="320"
+            cy="200"
+            r="65"
+            fill="none"
+            stroke="#b4e1d4"
+            strokeWidth="3"
+            opacity=".4"
+          />
+          <path
+            d="M35 145H12V250H35"
+            fill="#63d5ff33"
+            stroke="#63d5ff"
+            strokeWidth="6"
+          />
+          <path
+            d="M605 145H628V250H605"
+            fill="#ffa15933"
+            stroke="#ffa159"
+            strokeWidth="6"
+          />
+          <g transform="translate(225 245) rotate(-24)">
+            <path d="M-30 -12L-110 0L-30 12" fill="#63d5ff" opacity=".5" />
+            <rect
+              x="-35"
+              y="-22"
+              width="70"
+              height="44"
+              rx="12"
+              fill="#63d5ff"
+            />
+            <rect
+              x="-10"
+              y="-16"
+              width="25"
+              height="32"
+              rx="5"
+              fill="#173550"
+            />
+            <path d="M24 -15V-5 M24 5V15" stroke="#fff5d2" strokeWidth="5" />
+          </g>
+          <g transform="translate(455 140) rotate(150)">
+            <path d="M-30 -12L-100 0L-30 12" fill="#ffa159" opacity=".5" />
+            <rect
+              x="-35"
+              y="-22"
+              width="70"
+              height="44"
+              rx="12"
+              fill="#ffa159"
+            />
+            <rect
+              x="-10"
+              y="-16"
+              width="25"
+              height="32"
+              rx="5"
+              fill="#51382e"
+            />
+          </g>
+          <circle
+            cx="337"
+            cy="192"
+            r="29"
+            fill="#eff9e6"
+            stroke="#9eb7bb"
+            strokeWidth="3"
+          />
+          <path d="M337 180L348 188L344 201H330L326 188Z" fill="#264958" />
+          <text
+            x="320"
+            y="380"
+            fill="#cde8e7"
+            textAnchor="middle"
+            fontSize="17"
+            fontWeight="800"
+            letterSpacing="7"
+          >
+            OWN THE ARENA
+          </text>
+        </g>
+      ) : kind === "racing" ? (
         <>
           <circle cx="440" cy="115" r="77" fill="#ffd5a1" />
           <path

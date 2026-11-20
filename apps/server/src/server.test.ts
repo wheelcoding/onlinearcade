@@ -428,3 +428,57 @@ test("Party Planet launches one shared match, isolates room snapshots and accept
     await f.close();
   }
 });
+
+test("Boostball launches one shared match, isolates room snapshots and accepts only owned controls", async () => {
+  const f = await fixture();
+  try {
+    const a = await f.client(),
+      b = await f.client(),
+      other = await f.client();
+    const { state: room } = await f.create(a, "Alex");
+    await f.action(b, { action: "join", name: "Sam", code: room.code });
+    await f.action(a, { action: "ready", ready: true });
+    await f.action(b, { action: "ready", ready: true });
+    assert.match(
+      (await f.action(b, { action: "start", game: "boostball" })).error!,
+      /host/,
+    );
+    const session = event(a, "session");
+    assert.ok((await f.action(a, { action: "start", game: "boostball" })).ok);
+    const started = await session;
+    assert.equal(started.game, "boostball");
+    assert.equal(started.racers.length, 2);
+    let leaked = false;
+    other.on("ball:state", () => (leaked = true));
+    other.emit("ball:sync", started.id);
+    const received = event<any>(b, "ball:state");
+    b.emit("ball:sync", started.id);
+    assert.equal((await received).cars.length, 2);
+    const packets: any[] = [];
+    a.on("ball:state", (p) => packets.push(p));
+    const controls = setInterval(
+      () =>
+        a.emit("ball:input", {
+          sessionId: started.id,
+          seq: Date.now(),
+          input: { throttle: 1, steer: 0, boost: true, dodge: false },
+          score: 99999,
+        }),
+      40,
+    );
+    try {
+      await new Promise((r) => setTimeout(r, 3400));
+    } finally {
+      clearInterval(controls);
+    }
+    assert.ok(packets.at(-1).cars[0].x > 240);
+    assert.deepEqual(packets.at(-1).score, [0, 0]);
+    assert.equal(packets.at(-1).cars[1].x, 740);
+    assert.equal(leaked, false);
+    const left = event<any>(a, "ball:state", (value) => !value.cars[1].active);
+    b.emit("ball:exit", started.id);
+    assert.equal((await left).cars[1].active, false);
+  } finally {
+    await f.close();
+  }
+});

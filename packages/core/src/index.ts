@@ -157,3 +157,4 @@ export * from "./race-sim";
 export * from "./arcade-sim";
 export * from "./party-planet";
 export * from "./cloudbound";
+export * from "./boostball";

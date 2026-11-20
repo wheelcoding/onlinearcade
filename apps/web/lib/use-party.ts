@@ -10,7 +10,11 @@ import type {
   PartySession,
 } from "../../server/src/protocol";
 export type ConnectionState =
-  "unconfigured" | "connecting" | "connected" | "reconnecting" | "offline";
+  | "unconfigured"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "offline";
 export function multiplayerEndpoint(
   config: string | undefined,
   hostname: string,
@@ -171,7 +175,9 @@ export function useParty(onStart: (race?: OnlineRaceLink) => void) {
     });
     s.on("session", (value: PartySession) => {
       if (
-        !["neon-dash", "kart-circuit", "party-planet"].includes(value?.game) ||
+        !["neon-dash", "kart-circuit", "party-planet", "boostball"].includes(
+          value?.game,
+        ) ||
         typeof value.id !== "string" ||
         !Number.isFinite(value.startsAt) ||
         (value.game === "neon-dash" && value.startsAt < Date.now() - 1000) ||
@@ -181,10 +187,16 @@ export function useParty(onStart: (race?: OnlineRaceLink) => void) {
         return;
       seenSession.current = value.id;
       if (sessionTimer.current) clearTimeout(sessionTimer.current);
-      if (value.game === "kart-circuit" || value.game === "party-planet") {
+      if (
+        value.game === "kart-circuit" ||
+        value.game === "party-planet" ||
+        value.game === "boostball"
+      ) {
         if (
           identity.current &&
-          (value.game === "party-planet" || value.track) &&
+          (value.game === "party-planet" ||
+            value.game === "boostball" ||
+            value.track) &&
           value.racers?.some((p) => p.memberId === identity.current)
         ) {
           setNotice("");
@@ -237,6 +249,16 @@ export function useParty(onStart: (race?: OnlineRaceLink) => void) {
       ) {
         setError(
           "Party Planet needs the latest server update. In Render, choose Manual Deploy → Deploy latest commit. Solo practice is available now.",
+        );
+        return false;
+      }
+      if (
+        payload.action === "start" &&
+        payload.game === "boostball" &&
+        !features.includes("boostball")
+      ) {
+        setError(
+          "Boostball needs the latest multiplayer server. In Render, choose Manual Deploy → Deploy latest commit. Practice is available now.",
         );
         return false;
       }

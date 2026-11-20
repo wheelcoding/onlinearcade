@@ -1,3 +1,4 @@
+import { OnlineBall } from "./online-ball.js";
 import { OnlinePlanet } from "./online-planet.js";
 import { OnlineRace } from "./online-race.js";
 import { TRACK_IDS } from "@onlinearcade/core";
@@ -16,6 +17,7 @@ type Room = Omit<PartyState, "players"> & {
   lastStart: number;
   race?: OnlineRace;
   planet?: OnlinePlanet;
+  ball?: OnlineBall;
 };
 type Options = {
   reconnectGraceMs?: number;
@@ -45,7 +47,7 @@ export function createArcadeServer(
           status: "ok",
           service: "onlinearcade-multiplayer",
           version: 2,
-          features: ["shared-kart-racing", "party-planet"],
+          features: ["shared-kart-racing", "party-planet", "boostball"],
         }),
       );
     } else {
@@ -79,6 +81,7 @@ export function createArcadeServer(
   function remove(room: Room, member: Member) {
     room.race?.exit(member.id);
     room.planet?.exit(member.id);
+    room.ball?.exit(member.id);
     clearTimeout(member.expiry);
     credentials.delete(member.token);
     room.players = room.players.filter((p) => p.id !== member.id);
@@ -167,7 +170,8 @@ export function createArcadeServer(
         room.session &&
         (room.session.startsAt > Date.now() ||
           (room.race && !room.race.complete) ||
-          (room.planet && !room.planet.complete))
+          (room.planet && !room.planet.complete) ||
+          (room.ball && !room.ball.complete))
       )
         socket.emit("session", room.session);
     });
@@ -318,7 +322,8 @@ export function createArcadeServer(
           });
         if (
           (room.race && !room.race.complete) ||
-          (room.planet && !room.planet.complete)
+          (room.planet && !room.planet.complete) ||
+          (room.ball && !room.ball.complete)
         )
           return reply({
             error:
@@ -326,16 +331,22 @@ export function createArcadeServer(
           });
         if (
           raw.game !== undefined &&
-          !["neon-dash", "kart-circuit", "party-planet"].includes(raw.game)
+          !["neon-dash", "kart-circuit", "party-planet", "boostball"].includes(
+            raw.game,
+          )
         )
           return reply({ error: "Unknown party game." });
         if (raw.game === "kart-circuit" && !TRACK_IDS.includes(raw.track))
           return reply({ error: "Choose a valid racing track." });
         if (
-          (raw.game === "kart-circuit" || raw.game === "party-planet") &&
+          (raw.game === "kart-circuit" ||
+            raw.game === "party-planet" ||
+            raw.game === "boostball") &&
           [...rooms.values()].filter(
             (r) =>
-              (r.race && !r.race.complete) || (r.planet && !r.planet.complete),
+              (r.race && !r.race.complete) ||
+              (r.planet && !r.planet.complete) ||
+              (r.ball && !r.ball.complete),
           ).length >= 12
         )
           return reply({
@@ -345,12 +356,16 @@ export function createArcadeServer(
         room.session = {
           id: randomUUID(),
           game:
-            raw.game === "party-planet"
-              ? "party-planet"
-              : raw.game === "kart-circuit"
-                ? "kart-circuit"
-                : "neon-dash",
-          ...(raw.game === "kart-circuit" || raw.game === "party-planet"
+            raw.game === "boostball"
+              ? "boostball"
+              : raw.game === "party-planet"
+                ? "party-planet"
+                : raw.game === "kart-circuit"
+                  ? "kart-circuit"
+                  : "neon-dash",
+          ...(raw.game === "kart-circuit" ||
+          raw.game === "party-planet" ||
+          raw.game === "boostball"
             ? {
                 ...(raw.game === "kart-circuit" ? { track: raw.track } : {}),
                 racers: room.players.map((p, i) => ({
@@ -383,6 +398,10 @@ export function createArcadeServer(
         room.planet =
           room.session.game === "party-planet"
             ? new OnlinePlanet(room.session.id, room.session.racers!)
+            : undefined;
+        room.ball =
+          room.session.game === "boostball"
+            ? new OnlineBall(room.session.id, room.session.racers!)
             : undefined;
         room.players.forEach((p) => (p.ready = false));
         update(room);
@@ -436,7 +455,32 @@ export function createArcadeServer(
       if (member && room?.planet && room.planet.id === id)
         room.planet.exit(member.id);
     });
-    socket.emit("capabilities", ["shared-kart-racing", "party-planet"]);
+    socket.on("ball:input", (raw) => {
+      const now = Date.now();
+      inputTokens = Math.min(45, inputTokens + (now - inputAt) * 0.035);
+      inputAt = now;
+      if (inputTokens < 1) return;
+      inputTokens--;
+      const { room, member } = current();
+      if (room?.ball && member) room.ball.command(member.id, raw, now);
+    });
+    socket.on("ball:sync", (id) => {
+      if (tokens < 1) return;
+      tokens--;
+      const { room, member } = current();
+      if (member && room?.ball && room.ball.id === id)
+        socket.emit("ball:state", room.ball.packet());
+    });
+    socket.on("ball:exit", (id) => {
+      const { room, member } = current();
+      if (member && room?.ball && room.ball.id === id)
+        room.ball.exit(member.id);
+    });
+    socket.emit("capabilities", [
+      "shared-kart-racing",
+      "party-planet",
+      "boostball",
+    ]);
     presence();
     socket.on("disconnect", () => {
       ips.set(socket.data.ip, Math.max(0, (ips.get(socket.data.ip) || 1) - 1));
@@ -475,6 +519,15 @@ export function createArcadeServer(
         );
         if (broadcasts % 4 === 0 || room.planet.complete)
           io.to(room.code).emit("planet:state", room.planet.packet());
+      }
+      if (room.ball && !room.ball.complete) {
+        room.ball.advance(
+          dt,
+          new Set(room.players.filter((p) => p.connected).map((p) => p.id)),
+          now,
+        );
+        if (broadcasts % 4 === 0 || room.ball.complete)
+          io.to(room.code).emit("ball:state", room.ball.packet());
       }
       if (room.race && !room.race.complete) {
         room.race.advance(
