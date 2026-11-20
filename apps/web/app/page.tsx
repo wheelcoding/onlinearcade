@@ -305,6 +305,7 @@ export default function Home() {
           onNameChange={setGuestName}
           signedIn={!!cloud.user}
           onStart={(race) => {
+            setPlanetOpen(false);
             if (race) {
               setPlaying(null);
               setOnlineRace(race);
