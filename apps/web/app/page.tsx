@@ -33,6 +33,16 @@ import {
   Joystick,
   Check,
 } from "lucide-react";
+const Cloudbound = dynamic(() => import("../components/Cloudbound"), {
+  ssr: false,
+  loading: () => (
+    <div className="modal">
+      <div className="game-dialog" role="status">
+        Preparing Cloudbound…
+      </div>
+    </div>
+  ),
+});
 const PartyPlanet = dynamic(() => import("../components/PartyPlanet"), {
   ssr: false,
 });
@@ -59,6 +69,7 @@ const categories = [
 export default function Home() {
   const cloud = useAccount();
   const [planetOpen, setPlanetOpen] = useState(false);
+  const [cloudOpen, setCloudOpen] = useState(false);
   const [onlineRace, setOnlineRace] = useState<OnlineRaceLink | null>(null);
   const [boardMode, setBoardMode] = useState<"local" | "community">(
     "community",
@@ -154,7 +165,7 @@ export default function Home() {
               <span className="spark">✳</span>
             </h1>
             <p>
-              Your arcade. Your friends. Your games. Six original worlds, one
+              Your arcade. Your friends. Your games. Seven original worlds, one
               more round.
             </p>
             <div className="hero-actions">
@@ -264,17 +275,21 @@ export default function Home() {
                   <div className="game-footer">
                     <span>
                       {g.playable
-                        ? g.id === "party-planet"
-                          ? "↗ Practice or play with friends"
-                          : "↗ Chase your personal best"
+                        ? g.id === "cloudbound"
+                          ? "↗ Climb to your personal best"
+                          : g.id === "party-planet"
+                            ? "↗ Practice or play with friends"
+                            : "↗ Chase your personal best"
                         : "Something good is on the way"}
                     </span>
                     {g.playable ? (
                       <button
                         onClick={() =>
-                          g.id === "party-planet"
-                            ? setPlanetOpen(true)
-                            : setPlaying(g.id as GameId)
+                          g.id === "cloudbound"
+                            ? setCloudOpen(true)
+                            : g.id === "party-planet"
+                              ? setPlanetOpen(true)
+                              : setPlaying(g.id as GameId)
                         }
                         aria-label={`Play ${g.title}`}
                       >
@@ -296,7 +311,7 @@ export default function Home() {
             </div>
           )}
           <p className="library-note">
-            Six playable originals. Fresh challenges. No downloads.{" "}
+            Seven playable originals. Fresh challenges. No downloads.{" "}
             <span>Stay for one more round. ↗</span>
           </p>
         </section>
@@ -391,6 +406,7 @@ export default function Home() {
           signedIn={!!cloud.user}
           onStart={(race) => {
             setPlanetOpen(false);
+            setCloudOpen(false);
             if (race) {
               setPlaying(null);
               setOnlineRace(race);
@@ -538,6 +554,12 @@ export default function Home() {
           </span>
         </footer>
       </main>
+      {cloudOpen && (
+        <Cloudbound
+          accountId={cloud.user?.id}
+          onClose={() => setCloudOpen(false)}
+        />
+      )}
       {(planetOpen || onlineRace?.session.game === "party-planet") && (
         <PartyPlanet
           link={

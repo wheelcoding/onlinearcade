@@ -3,16 +3,23 @@ import assert from "node:assert/strict";
 import { io as connect, type Socket } from "socket.io-client";
 import { createArcadeServer } from "./server.js";
 import type { PartyState, PartyReply } from "./protocol.js";
-const event = <T = any>(s: Socket, n: string) =>
+const event = <T = any>(
+  s: Socket,
+  n: string,
+  matches: (value: T) => boolean = () => true,
+) =>
   new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error("Timed out waiting for " + n)),
-      3000,
-    );
-    s.once(n, (value) => {
+    const receive = (value: T) => {
+      if (!matches(value)) return;
       clearTimeout(timer);
+      s.off(n, receive);
       resolve(value);
-    });
+    };
+    const timer = setTimeout(() => {
+      s.off(n, receive);
+      reject(new Error("Timed out waiting for " + n));
+    }, 3000);
+    s.on(n, receive);
   });
 async function fixture(options: Parameters<typeof createArcadeServer>[1] = {}) {
   const { http, io } = createArcadeServer("http://localhost:3000", options);
@@ -348,7 +355,9 @@ test("shared kart races require host/ready checks and isolate snapshots and cont
     assert.equal(latest.cars[1].lastInput.throttle, 0);
     assert.notEqual(latest.cars[0].x, 999999);
     assert.equal(leaked, false);
-    const withdrawn = event(b, "race:state");
+    const withdrawn = event(b, "race:state", (value) =>
+      value.withdrawn.includes(0),
+    );
     a.emit("race:exit", started.id);
     assert.ok((await withdrawn).withdrawn.includes(0));
     a.emit("race:input", {
@@ -408,7 +417,11 @@ test("Party Planet launches one shared match, isolates room snapshots and accept
     assert.ok(packets.at(-1).players[0].x > 210);
     assert.equal(packets.at(-1).players[1].x, 385);
     assert.equal(leaked, false);
-    const left = event<any>(a, "planet:state");
+    const left = event<any>(
+      a,
+      "planet:state",
+      (value) => !value.players[1].active,
+    );
     b.emit("planet:exit", started.id);
     assert.equal((await left).players[1].active, false);
   } finally {
