@@ -190,8 +190,9 @@ export function createBoostballView(
     x: number,
     y: number,
     z: number,
+    parent: T.Object3D = scene,
   ) => {
-    const piece = box(w, h, d, mat, scene, x, y, z);
+    const piece = box(w, h, d, mat, parent, x, y, z);
     piece.castShadow = false;
     return piece;
   };
@@ -308,7 +309,10 @@ export function createBoostballView(
   const standSection = standLength / 5;
   const frontRowZ = sideWallZ + 4.2;
   const secondRowZ = sideWallZ + 11.4;
-  for (const side of [-1, 1]) {
+  const gantries = [new T.Group(), new T.Group()];
+  scene.add(...gantries);
+  for (const [index, side] of [-1, 1].entries()) {
+    const gantry = gantries[index];
     const band = side < 0 ? blue : orange;
     const floodlight = glow(side < 0 ? 0xccecff : 0xffe1b2, 2.1);
     for (const [row, setback] of [frontRowZ, secondRowZ].entries()) {
@@ -350,7 +354,7 @@ export function createBoostballView(
     for (let bay = 0; bay <= 6; bay++) {
       const x = -standLength / 2 + (standLength * bay) / 6;
       const supportZ = side * (sideWallZ + 13.8);
-      shadowlessBox(0.54, 19, 0.68, steel, x, 9.5, supportZ);
+      shadowlessBox(0.54, 19, 0.68, steel, x, 9.5, supportZ, gantry);
       const beam = shadowlessBox(
         0.22,
         0.39,
@@ -359,9 +363,19 @@ export function createBoostballView(
         x,
         18,
         side * (sideWallZ + 7.8),
+        gantry,
       );
       beam.rotation.x = side * 0.14;
-      shadowlessBox(6.2, 0.35, 1.25, dark, x, 16.7, side * (sideWallZ + 0.65));
+      shadowlessBox(
+        6.2,
+        0.35,
+        1.25,
+        dark,
+        x,
+        16.7,
+        side * (sideWallZ + 0.65),
+        gantry,
+      );
       shadowlessBox(
         5.75,
         0.12,
@@ -370,6 +384,7 @@ export function createBoostballView(
         x,
         16.43,
         side * (sideWallZ + 0.65),
+        gantry,
       );
     }
     shadowlessBox(
@@ -1034,6 +1049,9 @@ export function createBoostballView(
         state.cars.find((c) => c.id === mine && c.active) ??
         state.cars.find((c) => c.active);
       const model = player ? cars.get(player.id) : undefined;
+      // The foreground lighting rig would obscure the near boost pads from above.
+      gantries[0].visible = mode !== "stadium" || camera.aspect >= 1;
+      gantries[1].visible = mode !== "stadium";
       if (mode === "stadium" || !player || !model) {
         if (camera.aspect < 1)
           desired.set(-endWallX * 1.58, endWallX * 2.16, 0);
