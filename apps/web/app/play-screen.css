@@ -544,10 +544,11 @@
   z-index: 2;
   right: var(--play-right);
   bottom: calc(var(--play-bottom) + 54px);
-  width: clamp(128px, 15vw, 178px);
-  border: 1px solid #ccedf431;
-  border-radius: 13px;
-  background: #0b1726db;
+  width: clamp(178px, 22vw, 296px);
+  border: 1px solid #ccedf455;
+  border-radius: 14px;
+  background: #112333ec;
+  box-shadow: 0 5px 24px #02091578;
   pointer-events: none;
 }
 .play-ball .ball-fuel {
@@ -805,7 +806,14 @@
     bottom: calc(var(--play-bottom) + 106px);
   }
 }
-@media (max-width: 540px), (max-height: 460px) {
+@media (max-width: 640px) and (orientation: portrait) {
+  .ball-minimap {
+    top: calc(var(--play-top) + 52px);
+    bottom: auto;
+    width: clamp(113px, 36vw, 178px);
+  }
+}
+@media (max-height: 460px) {
   .ball-minimap {
     display: none;
   }

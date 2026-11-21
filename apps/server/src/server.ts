@@ -31,6 +31,7 @@ const FEATURES = [
   "boostball",
   "boostball-3d",
   "boostball-pads",
+  "boostball-expanded-arena",
 ];
 export function createArcadeServer(
   origin = "http://localhost:3000",
@@ -408,7 +409,18 @@ export function createArcadeServer(
             : undefined;
         room.ball =
           room.session.game === "boostball"
-            ? new OnlineBall(room.session.id, room.session.racers!)
+            ? new OnlineBall(
+                room.session.id,
+                room.session.racers!,
+                room.players.every(
+                  (player) =>
+                    player.socketId &&
+                    io.sockets.sockets.get(player.socketId)?.handshake.auth
+                      .boostballArena === "expanded",
+                )
+                  ? "expanded"
+                  : "classic",
+              )
             : undefined;
         room.players.forEach((p) => (p.ready = false));
         update(room);

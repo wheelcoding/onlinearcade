@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   BoostballSimulation,
-  BOOSTBALL_PADS,
+  getBoostballArena,
   boostballBot,
   type BallInput,
   type BallState,
@@ -22,64 +22,139 @@ import { createArcadeAudio } from "../lib/arcade-audio";
 const MATCH_CONNECTED = "Connected · server-controlled match";
 
 function ArenaMap({ state, mine }: { state: BallState; mine: string }) {
-  const point = (x: number, y: number) => ({ cx: 8 + x / 6, cy: 8 + y / 6 });
+  const {
+    id,
+    length,
+    width,
+    centerX,
+    centerY,
+    field,
+    goalHalfWidth,
+    netDepth,
+    penaltyDepth,
+    penaltyHalfWidth,
+    goalAreaDepth,
+    goalAreaHalfWidth,
+    centerCircle,
+    pads: locations,
+  } = getBoostballArena(state.arena);
   const pads = state.pads;
+  const fieldLength = field.right - field.left;
+  const fieldWidth = field.bottom - field.top;
   return (
-    <svg className="ball-minimap" viewBox="0 0 176 106" aria-hidden="true">
+    <svg
+      className="ball-minimap"
+      viewBox={`-44 -10 ${length + 88} ${width + 20}`}
+      data-arena={id}
+      role="img"
+      aria-label={
+        id === "expanded" ? "Expanded Boostball minimap" : "Boostball minimap"
+      }
+    >
       <rect
-        x="8"
-        y="8"
-        width="160"
-        height="90"
-        rx="6"
-        fill="#1b363b"
-        stroke="#8fbab388"
+        x={field.left}
+        y={field.top}
+        width={fieldLength}
+        height={fieldWidth}
+        rx="15"
+        fill="#234841"
+        stroke="#a6cbbb"
+        strokeWidth="5"
       />
+      {Array.from({ length: 9 }, (_, i) => (
+        <rect
+          key={i}
+          x={field.left + (i * fieldLength) / 9}
+          y={field.top + 3}
+          width={fieldLength / 9}
+          height={fieldWidth - 6}
+          fill={i % 2 ? "#274c46" : "#2a534b"}
+        />
+      ))}
       <path
-        d="M88 8v90M8 39h23v28H8m160-28h-23v28h23"
+        d={`M${field.left} ${field.top + 41}H${field.right}M${field.left} ${field.bottom - 41}H${field.right}`}
         fill="none"
-        stroke="#8fbab372"
-      />
-      <circle cx="88" cy="53" r="15" fill="none" stroke="#8fbab372" />
-      <path
-        d="M5 43v20"
-        stroke="#79d7ff"
-        strokeWidth="4"
-        strokeLinecap="round"
+        stroke="#96beb681"
+        strokeWidth="3"
+        strokeDasharray="15 12"
       />
       <path
-        d="M171 43v20"
-        stroke="#ffb078"
-        strokeWidth="4"
-        strokeLinecap="round"
+        d={`M${centerX} ${field.top}V${field.bottom}`}
+        fill="none"
+        stroke="#a6cbbb"
+        strokeWidth="5"
       />
+      <circle
+        cx={centerX}
+        cy={centerY}
+        r={centerCircle}
+        fill="#1d3b3c"
+        stroke="#a6cbbb"
+        strokeWidth="5"
+      />
+      <circle cx={centerX} cy={centerY} r="6" fill="#bbdbbf" />
+      {[false, true].map((orange) => {
+        const x = orange ? field.right : field.left;
+        const color = orange ? "#ffc098" : "#9bdfff";
+        return (
+          <g key={x} stroke={color} strokeWidth="5">
+            <rect
+              x={orange ? x : x - netDepth}
+              y={centerY - goalHalfWidth}
+              width={netDepth}
+              height={goalHalfWidth * 2}
+              rx="7"
+              fill={orange ? "#704a43" : "#224e65"}
+            />
+            <rect
+              x={orange ? x - penaltyDepth : x}
+              y={centerY - penaltyHalfWidth}
+              width={penaltyDepth}
+              height={penaltyHalfWidth * 2}
+              fill={orange ? "#a8653e38" : "#4ea1bc3f"}
+            />
+            <rect
+              x={orange ? x - goalAreaDepth : x}
+              y={centerY - goalAreaHalfWidth}
+              width={goalAreaDepth}
+              height={goalAreaHalfWidth * 2}
+              fill="none"
+            />
+          </g>
+        );
+      })}
       {pads &&
-        BOOSTBALL_PADS.map((pad, index) => (
+        locations.map((pad, index) => (
           <circle
             key={index}
-            {...point(pad.x, pad.y)}
-            r="2.2"
-            fill={pads[index] > 0 ? "#596765" : "#ffe884"}
+            cx={pad.x}
+            cy={pad.y}
+            r="12"
+            strokeWidth="4"
+            stroke={pads[index] > 0 ? "#a3a68a" : "#ffe8a1"}
+            fill={pads[index] > 0 ? "#2b4840" : "#f6c45d"}
           />
         ))}
       {state.cars
         .filter((car) => car.active)
         .map((car) => (
-          <circle
+          <path
             key={car.id}
-            {...point(car.x, car.y)}
-            r={car.id === mine ? 4.2 : 3.3}
+            d="M22 0-15-14-9 0-15 14Z"
+            transform={`translate(${car.x} ${car.y}) rotate(${(car.angle * 180) / Math.PI})`}
             fill={car.team ? "#ffac70" : "#70cdff"}
-            stroke={car.id === mine ? "#fff6dc" : "#172830"}
-            strokeWidth="1.6"
+            stroke={car.id === mine ? "#fff6dc" : "#16212f"}
+            strokeWidth={car.id === mine ? 7 : 5}
+            strokeLinejoin="round"
           />
         ))}
       <circle
-        {...point(state.ball.x, state.ball.y)}
-        r="3.2"
+        cx={state.ball.x}
+        cy={state.ball.y}
+        r="15"
         fill="#fff6d8"
-        stroke="#111c29"
-        strokeWidth="1"
+        stroke="#132536"
+        strokeWidth="6"
       />
     </svg>
   );
@@ -248,91 +323,83 @@ export default function Boostball({
     }, 1000 / 30);
     import("./games/boostball-view")
       .then(({ createBoostballView }) => {
-        if (disposed || !mount.current) return;
-        try {
-          view = createBoostballView(
-            mount.current,
-            mine,
-            indicator.current,
-            () => {
+        const target = mount.current;
+        if (disposed || !target) return;
+        const onLost = () => {
+          paused = true;
+          held.current.clear();
+          setError(
+            "The 3D graphics context was interrupted. Use Reload stadium to reconnect.",
+          );
+        };
+        setLoading(false);
+        previousFrame = performance.now();
+        const animate = (now: number) => {
+          if (disposed || paused) return;
+          const dt = Math.min(0.05, Math.max(0, (now - previousFrame) / 1000));
+          previousFrame = now;
+          if (sim && !pauseRef.current) {
+            const tick = sim.state.tick;
+            soloInputs.set(mine, input());
+            if (!freePlay)
+              soloInputs.set("bot", boostballBot(sim.state, "bot"));
+            sim.advance(dt, soloInputs);
+            if (sim.state.tick > tick)
+              queued.current = { jump: false, dodge: false };
+            latest = sim.state;
+          }
+          const s = latest;
+          if (s) {
+            const totalGoals = s.score[0] + s.score[1];
+            if (totalGoals > previousGoals) audio.current?.cue("finish");
+            previousGoals = totalGoals;
+            const count = Math.ceil(s.countdown);
+            if (count && count !== previousCount) audio.current?.cue("move");
+            if (!count && previousCount && !s.complete)
+              audio.current?.cue("kickoff");
+            previousCount = count;
+            if (s.lastTouch && s.lastTouch.tick > previousTouch) {
+              previousTouch = s.lastTouch.tick;
+              if (s.tick - previousTouch < 20)
+                audio.current?.cue("ball-contact");
+            }
+            const fuel = s.cars.find((car) => car.id === mine)?.fuel ?? 100;
+            if (!count && fuel - previousFuel > 19)
+              audio.current?.cue("pickup");
+            previousFuel = fuel;
+            if (now - hudAt > 100) {
+              hudAt = now;
+              setHud({
+                ...s,
+                score: [...s.score],
+                ball: { ...s.ball },
+                pads: s.pads && [...s.pads],
+                cars: s.cars.map((c) => ({ ...c })),
+              });
+              if (link && now - lastPacket > 3000 && !s.complete)
+                setNotice("Waiting for server snapshots…");
+            }
+            try {
+              view ??= createBoostballView(
+                target,
+                mine,
+                getBoostballArena(s.arena),
+                indicator.current,
+                onLost,
+              );
+              view.draw(s, pauseRef.current ? 0 : dt, cameraRef.current);
+            } catch {
               paused = true;
               held.current.clear();
               setError(
-                "The 3D graphics context was interrupted. Use Reload stadium to reconnect.",
+                "The stadium could not render. Use Reload stadium to retry.",
               );
-            },
-          );
-          setLoading(false);
-          previousFrame = performance.now();
-          const animate = (now: number) => {
-            if (disposed || paused) return;
-            const dt = Math.min(
-              0.05,
-              Math.max(0, (now - previousFrame) / 1000),
-            );
-            previousFrame = now;
-            if (sim && !pauseRef.current) {
-              const tick = sim.state.tick;
-              soloInputs.set(mine, input());
-              if (!freePlay)
-                soloInputs.set("bot", boostballBot(sim.state, "bot"));
-              sim.advance(dt, soloInputs);
-              if (sim.state.tick > tick)
-                queued.current = { jump: false, dodge: false };
-              latest = sim.state;
+              return;
             }
-            const s = latest;
-            if (s) {
-              const totalGoals = s.score[0] + s.score[1];
-              if (totalGoals > previousGoals) audio.current?.cue("finish");
-              previousGoals = totalGoals;
-              const count = Math.ceil(s.countdown);
-              if (count && count !== previousCount) audio.current?.cue("move");
-              if (!count && previousCount && !s.complete)
-                audio.current?.cue("kickoff");
-              previousCount = count;
-              if (s.lastTouch && s.lastTouch.tick > previousTouch) {
-                previousTouch = s.lastTouch.tick;
-                if (s.tick - previousTouch < 20)
-                  audio.current?.cue("ball-contact");
-              }
-              const fuel = s.cars.find((car) => car.id === mine)?.fuel ?? 100;
-              if (!count && fuel - previousFuel > 19)
-                audio.current?.cue("pickup");
-              previousFuel = fuel;
-              if (now - hudAt > 100) {
-                hudAt = now;
-                setHud({
-                  ...s,
-                  score: [...s.score],
-                  ball: { ...s.ball },
-                  pads: s.pads && [...s.pads],
-                  cars: s.cars.map((c) => ({ ...c })),
-                });
-                if (link && now - lastPacket > 3000 && !s.complete)
-                  setNotice("Waiting for server snapshots…");
-              }
-              try {
-                view?.draw(s, pauseRef.current ? 0 : dt, cameraRef.current);
-              } catch {
-                paused = true;
-                held.current.clear();
-                setError(
-                  "The stadium could not render. Use Reload stadium to retry.",
-                );
-                return;
-              }
-            }
-            frame = requestAnimationFrame(animate);
-          };
+          }
           frame = requestAnimationFrame(animate);
-        } catch (cause) {
-          console.error("Boostball stadium initialization failed", cause);
-          setLoading(false);
-          setError(
-            "Could not start 3D graphics. Enable WebGL in your browser, then reload the stadium.",
-          );
-        }
+        };
+        frame = requestAnimationFrame(animate);
       })
       .catch(() => {
         if (!disposed) {
