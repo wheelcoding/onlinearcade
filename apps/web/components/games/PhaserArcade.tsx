@@ -335,7 +335,7 @@ export default function PhaserArcade({
   return (
     <div
       ref={mount}
-      className={`canvas-wrap engine-canvas ${gameId === "tile-shift" ? "puzzle-canvas" : ""}`}
+      className="canvas-wrap engine-canvas"
       aria-label={`${gameId} interactive game canvas`}
     />
   );

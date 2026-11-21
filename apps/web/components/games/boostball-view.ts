@@ -9,6 +9,8 @@ export type BallView = {
 };
 const BLUE = 0x39c5ff,
   ORANGE = 0xff934f;
+const END_WALL_X = 37.25;
+const SIDE_WALL_Z = 20;
 const scale = (x: number, y: number, height = 0) =>
   new T.Vector3((x - 480) / 12, height / 12, (y - 270) / 12);
 /** Procedural original models and textures; no remote assets or per-frame geometry allocation. */
@@ -189,13 +191,13 @@ export function createBoostballView(
     depthWrite: false,
   });
   materials.add(boardMat);
-  for (const z of [-20, 20]) {
+  for (const z of [-SIDE_WALL_Z, SIDE_WALL_Z]) {
     box(75, 14, 0.18, boardMat, scene, 0, 7, z);
     box(75, 0.12, 0.18, glow(0x65a3be, 0.8), scene, 0, 0.12, z);
     box(75, 0.1, 0.14, steel, scene, 0, 2.6, z);
   }
   for (const sign of [-1, 1]) {
-    const x = sign * 37.25,
+    const x = sign * END_WALL_X,
       team = sign > 0 ? orange : blue;
     for (const z of [-12.5, 12.5]) {
       box(0.18, 14, 15, boardMat, scene, x, 7, z);
@@ -742,8 +744,11 @@ export function createBoostballView(
           Math.max(8, p.y + 7.5) + speed / 230,
           p.z - dz * distance,
         );
-        desired.x = Math.max(-48, Math.min(48, desired.x));
-        desired.z = Math.max(-28, Math.min(28, desired.z));
+        // Keep the follow camera inside the walls for a clear view near goals.
+        desired.x = T.MathUtils.clamp(desired.x, 1 - END_WALL_X, END_WALL_X - 1);
+        desired.z = T.MathUtils.clamp(desired.z, 1 - SIDE_WALL_Z, SIDE_WALL_Z - 1);
+        const followDistance = Math.hypot(desired.x - p.x, desired.z - p.z);
+        aim.lerp(p, Math.max(0, 1 - followDistance / distance));
         camera.fov =
           62 + Math.min(10, speed / 50) + Math.max(0, 1.1 - camera.aspect) * 20;
       }
