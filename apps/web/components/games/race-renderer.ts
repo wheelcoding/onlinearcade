@@ -258,22 +258,24 @@ export function createRaceView(
         ghost.group.rotation.y = pose.heading;
       }
       line.visible = racingLine;
-      for (let i = 0; i < 28; i++) {
-        const t = player.progress + ((i + 1) * 3.7) / state.length,
-          point = trackPose(state.samples, t),
-          safe = cornerSpeed(state.samples, t, state.length, 16);
-        dummy.position.set(point.x, point.y + 0.16, point.z);
-        dummy.rotation.set(0, Math.atan2(point.tx, point.tz), 0);
-        dummy.scale.setScalar(1);
-        dummy.updateMatrix();
-        line.setMatrixAt(i, dummy.matrix);
-        line.setColorAt(
-          i,
-          Math.abs(player.speed) > safe + 4 ? brakeColor : safeColor,
-        );
+      if (racingLine) {
+        for (let i = 0; i < 28; i++) {
+          const t = player.progress + ((i + 1) * 3.7) / state.length,
+            point = trackPose(state.samples, t),
+            safe = cornerSpeed(state.samples, t, state.length, 16);
+          dummy.position.set(point.x, point.y + 0.16, point.z);
+          dummy.rotation.set(0, Math.atan2(point.tx, point.tz), 0);
+          dummy.scale.setScalar(1);
+          dummy.updateMatrix();
+          line.setMatrixAt(i, dummy.matrix);
+          line.setColorAt(
+            i,
+            Math.abs(player.speed) > safe + 4 ? brakeColor : safeColor,
+          );
+        }
+        line.instanceMatrix.needsUpdate = true;
+        if (line.instanceColor) line.instanceColor.needsUpdate = true;
       }
-      line.instanceMatrix.needsUpdate = true;
-      if (line.instanceColor) line.instanceColor.needsUpdate = true;
       if (state.tick < lastTick) {
         lastSkid = null;
         skidCount = 0;
@@ -370,10 +372,11 @@ export function createRaceView(
           Math.cos(direction - cameraYaw),
         ) *
         (1 - Math.exp(-dt * 5));
-      const distance = 9 + v * 0.1;
+      const portrait = Math.max(0, 1 - camera.aspect);
+      const distance = 9 + v * 0.1 + portrait * 6;
       desired.set(
         player.x - Math.sin(cameraYaw) * distance,
-        road.y + 4.9 + v * 0.015,
+        road.y + 4.9 + v * 0.015 + portrait * 4,
         player.z - Math.cos(cameraYaw) * distance,
       );
       camera.position.lerp(desired, 1 - Math.exp(-dt * 7));
@@ -384,7 +387,10 @@ export function createRaceView(
       );
       camera.lookAt(look);
       const targetFov =
-        64 + v * 0.13 + (player.boosting || player.turbo > 0 ? 5 : 0);
+        64 +
+        v * 0.13 +
+        portrait * 16 +
+        (player.boosting || player.turbo > 0 ? 5 : 0);
       if (Math.abs(camera.fov - targetFov) > 0.02) {
         camera.fov += (targetFov - camera.fov) * (1 - Math.exp(-dt * 4));
         camera.updateProjectionMatrix();

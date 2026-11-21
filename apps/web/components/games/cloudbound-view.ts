@@ -316,12 +316,24 @@ export function createCloudView(
     }),
   );
   scene.add(dust);
+  const nextRing = add(
+    new T.TorusGeometry(1, 0.035, 8, 48),
+    new T.MeshBasicMaterial({
+      color: 0xd2fff2,
+      transparent: true,
+      opacity: 0.83,
+    }),
+    scene,
+  );
+  nextRing.castShadow = false;
+  nextRing.rotation.x = -Math.PI / 2;
   const cameraTarget = new T.Vector3(),
     desired = new T.Vector3();
   camera.position.set(sim.x, sim.y + 10, sim.z - 14);
   const resize = () => {
     camera.aspect =
       Math.max(1, target.clientWidth) / Math.max(1, target.clientHeight);
+    camera.fov = 52 + Math.max(0, 1 - camera.aspect) * 21;
     camera.updateProjectionMatrix();
     renderer.setSize(target.clientWidth, target.clientHeight);
   };
@@ -399,7 +411,15 @@ export function createCloudView(
         shadow.scale.setScalar(Math.max(0.5, 1 - (s.y - below.y) * 0.05));
         landing.visible = s.standing === null;
       }
-      desired.set(s.x, s.y + 9.5, s.z - 13.5);
+      const next = CLOUD_PLATFORMS[s.reached + 1];
+      nextRing.visible = !!next && s.visible(next);
+      if (next && nextRing.visible) {
+        const pose = s.pose(next);
+        nextRing.position.set(pose.x, pose.y + 0.08, pose.z);
+        nextRing.scale.setScalar(1.23 + Math.sin(s.time * 5) * 0.12);
+      }
+      const portrait = Math.max(0, 1 - camera.aspect);
+      desired.set(s.x, s.y + 9.5 + portrait * 2.8, s.z - 13.5 - portrait * 3.4);
       camera.position.lerp(desired, 1 - Math.exp(-dt * 6));
       cameraTarget.set(s.x, s.y + 1.1, s.z + 4.5);
       camera.lookAt(cameraTarget);
@@ -553,8 +573,14 @@ function createCloudCanvas(target: HTMLElement): CloudView {
           );
         }
         if (p.id === s.reached + 1) {
+          const pulse = scale * (1.35 + Math.sin(s.time * 5) * 0.12);
+          g.strokeStyle = "#f6fff0";
+          g.lineWidth = 3;
+          g.beginPath();
+          g.ellipse(center.x, center.y, pulse, pulse * 0.32, 0, 0, Math.PI * 2);
+          g.stroke();
           g.fillStyle = "#344153";
-          g.font = "bold 12px system-ui";
+          g.font = "bold 13px system-ui";
           g.textAlign = "center";
           g.fillText("NEXT", center.x, center.y - scale * 0.4);
         }

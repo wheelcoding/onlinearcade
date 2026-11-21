@@ -5,6 +5,15 @@ import type { RacePacket } from "../../server/src/protocol";
 import type { OnlineRaceLink } from "../lib/use-party";
 import { createRaceView } from "./games/race-renderer";
 import type { RaceView } from "./games/race-canvas";
+import TrackMap from "./games/TrackMap";
+import {
+  PlayOptions,
+  PlayScreen,
+  PlayTouchControls,
+  driveKeys,
+  isGameInput,
+  raceKeys,
+} from "./PlayScreen";
 
 /** Render authoritative snapshots; interpolate poses without inventing opponent movement. */
 export default function OnlineKart({
@@ -15,22 +24,21 @@ export default function OnlineKart({
   onClose: () => void;
 }) {
   const mount = useRef<HTMLDivElement>(null),
-    dialog = useRef<HTMLElement>(null),
-    keys = useRef(new Set<string>()),
-    close = useRef(onClose);
-  close.current = onClose;
+    keys = useRef(new Set<string>());
   const [hud, setHud] = useState<RacePacket | null>(null),
     [notice, setNotice] = useState("Connecting to the race…"),
     [error, setError] = useState("");
-  const [renderer, setRenderer] = useState("");
+  const [attempt, setAttempt] = useState(0);
   const { session, socket, memberId } = link;
   const myId = session.racers!.findIndex((p) => p.memberId === memberId);
   const exit = () => {
     socket.emit("race:exit", session.id);
-    close.current();
+    onClose();
   };
   useEffect(() => {
     if (!mount.current || myId < 0 || !session.track || !session.racers) return;
+    setError("");
+    setNotice("Connecting to the race…");
     const sim = new RaceSimulation(
       session.track,
       "grand-prix",
@@ -42,7 +50,6 @@ export default function OnlineKart({
     let view: RaceView;
     try {
       view = createRaceView(mount.current, sim, "balanced");
-      setRenderer(view.mode);
     } catch {
       setError(
         "The racing renderer could not start. Return to the party and try again.",
@@ -98,43 +105,13 @@ export default function OnlineKart({
       keys.current.clear();
     };
     const keydown = (e: KeyboardEvent) => {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLSelectElement ||
-        e.target instanceof HTMLTextAreaElement
-      )
-        return;
+      if (!isGameInput(e)) return;
       if (
         ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(
           e.code,
         )
       )
         e.preventDefault();
-      if (e.code === "Escape") {
-        socket.emit("race:exit", session.id);
-        close.current();
-        return;
-      }
-      if (e.key === "Tab") {
-        const nodes = dialog.current?.querySelectorAll<HTMLElement>(
-          "button:not([disabled]),select,input",
-        );
-        if (nodes?.length) {
-          const first = nodes[0],
-            last = nodes[nodes.length - 1];
-          if (
-            e.shiftKey &&
-            (document.activeElement === first ||
-              document.activeElement === dialog.current)
-          ) {
-            e.preventDefault();
-            last.focus();
-          } else if (!e.shiftKey && document.activeElement === last) {
-            e.preventDefault();
-            first.focus();
-          }
-        }
-      }
       if (e.code === "KeyR" && !e.repeat) recover = true;
       keys.current.add(e.code);
     };
@@ -202,10 +179,6 @@ export default function OnlineKart({
     };
     const resize = new ResizeObserver(view.resize);
     resize.observe(mount.current);
-    const before = document.activeElement as HTMLElement | null,
-      overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialog.current?.focus();
     window.addEventListener("keydown", keydown);
     window.addEventListener("keyup", keyup);
     window.addEventListener("blur", blur);
@@ -224,10 +197,8 @@ export default function OnlineKart({
       window.removeEventListener("keydown", keydown);
       window.removeEventListener("keyup", keyup);
       window.removeEventListener("blur", blur);
-      document.body.style.overflow = overflow;
-      before?.focus();
     };
-  }, [session, socket, memberId, myId]);
+  }, [session, socket, memberId, myId, attempt]);
   const player = hud?.cars[myId];
   const standings = [...(hud?.cars ?? [])].sort((a, b) => {
     if (hud?.withdrawn.includes(a.id) !== hud?.withdrawn.includes(b.id))
@@ -240,109 +211,135 @@ export default function OnlineKart({
           ? 1
           : b.raceProgress - a.raceProgress;
   });
-  const touch = (key: string, label: string) => (
-    <button
-      key={key}
-      aria-label={label}
-      onPointerDown={(e) => {
-        e.preventDefault();
-        e.currentTarget.setPointerCapture(e.pointerId);
-        keys.current.add(key);
-      }}
-      onPointerUp={() => keys.current.delete(key)}
-      onPointerCancel={() => keys.current.delete(key)}
-      onLostPointerCapture={() => keys.current.delete(key)}
-    >
-      {label}
-    </button>
-  );
+  const track = session.track ? getTrack(session.track) : null;
+  const position = standings.findIndex((car) => car.id === myId) + 1;
   return (
-    <div className="modal">
-      <section
-        className="game-dialog online-race"
-        ref={dialog}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Sunset Circuit online race"
-      >
-        <header>
-          <div>
-            <small>LIVE MULTIPLAYER · {session.racers?.length} DRIVERS</small>
-            <h2>Sunset Circuit</h2>
-            <small>
-              {session.track ? getTrack(session.track).name : ""} · 3 laps
-            </small>
-          </div>
-          <button className="secondary" onClick={exit}>
-            Return to party
+    <PlayScreen
+      name="Sunset Circuit online race"
+      onExit={exit}
+      exitLabel="Return to party"
+      className="play-race play-online-race"
+      tools={
+        <PlayOptions>
+          <p>
+            <strong>Sunset Circuit · {track?.name}</strong>
+          </p>
+          <p>
+            WASD or arrows to drive. Shift boosts. Space drifts. The race
+            continues while you're away.
+          </p>
+          <button
+            disabled={hud?.complete || !!error}
+            onClick={() => keys.current.add("KeyR")}
+          >
+            Recover kart (+2s)
           </button>
-        </header>
-        <p role="status">
-          {notice}
-          {renderer === "2d" ? " · 2D compatibility renderer" : ""}
-        </p>
-        {error && <p role="alert">{error}</p>}
+          <p role="status">{notice}</p>
+          {standings.map((car) => (
+            <p key={car.id}>
+              <strong>{car.name}</strong> ·{" "}
+              {hud?.withdrawn.includes(car.id)
+                ? "Left"
+                : car.finishedAt === null
+                  ? `Lap ${Math.min(3, car.laps + 1)}`
+                  : `${car.finishedAt.toFixed(2)}s`}
+            </p>
+          ))}
+        </PlayOptions>
+      }
+    >
+      <div tabIndex={-1} className="play-field">
         <div
           className="canvas-wrap engine-canvas kart-canvas"
           ref={mount}
           aria-label="Shared online race track"
         />
-        <div className="online-race-hud">
+        {track && player && (
+          <div className="race-minimap">
+            <TrackMap
+              track={track}
+              position={player}
+              rivals={standings.filter((car) => car.id !== myId)}
+              small
+            />
+          </div>
+        )}
+      </div>
+      {player && (
+        <div className="play-hud">
+          <span>Lap {Math.min(3, player.laps + 1)}/3</span>
           <strong>
-            {hud && hud.countdown > 0
-              ? `Starting in ${Math.ceil(hud.countdown)}`
-              : player?.finishedAt !== null && player
-                ? `Finished · ${player.finishedAt!.toFixed(2)}s`
-                : `Lap ${Math.min(3, (player?.laps ?? 0) + 1)} / 3`}
+            P{position}/{session.racers?.length}
           </strong>
-          <span>{Math.round(Math.abs(player?.speed ?? 0) * 3.6)} km/h</span>
-          <span>Boost {Math.round(player?.energy ?? 100)}%</span>
-          <span>
-            Position{" "}
-            {Math.max(1, standings.findIndex((c) => c.id === myId) + 1)} /{" "}
-            {session.racers!.length}
-          </span>
-          <span>{(hud?.time ?? 0).toFixed(1)}s</span>
+          <span className="hud-extra">{(hud?.time ?? 0).toFixed(1)}s</span>
         </div>
-        <ol className="online-race-standings">
-          {standings.map((c) => (
-            <li key={c.id}>
-              <span style={{ color: c.color }}>
-                {c.name}
-                {c.id === myId ? " (you)" : ""}
-              </span>{" "}
-              —{" "}
-              {hud?.withdrawn.includes(c.id)
-                ? "Left race · DNF"
-                : c.finishedAt !== null
-                  ? `${c.finishedAt.toFixed(2)}s`
-                  : `Lap ${Math.min(3, c.laps + 1)}`}
-            </li>
-          ))}
-        </ol>
-        <p className="muted">
-          W / ↑ accelerate · S / ↓ brake · A D / ← → steer · Space drift · Shift
-          boost · R recover (+2s). The race keeps running when you switch tabs.
-          Online results stay in this party.
-        </p>
-        <div className="online-race-touch">
-          {touch("KeyA", "←")}
-          {touch("KeyD", "→")}
-          {touch("KeyS", "Brake")}
-          {touch("KeyW", "Accelerate")}
-          {touch("Space", "Drift")}
-          {touch("ShiftLeft", "Boost")}
+      )}
+      {player && (
+        <div className="play-corner">
+          <strong>{Math.round(Math.abs(player.speed) * 3.6)} km/h</strong>
+          <progress
+            className="play-meter"
+            max={100}
+            value={player.energy}
+            aria-label="Boost energy"
+          />
         </div>
-        <button
-          className="secondary"
-          onClick={() => {
-            keys.current.add("KeyR");
-          }}
-        >
-          Recover kart (+2s)
-        </button>
-      </section>
-    </div>
+      )}
+      {hud &&
+        !hud.complete &&
+        (hud.countdown > 0 || notice !== "Live race · server connected") && (
+          <p className="play-message" role="status">
+            {notice !== "Live race · server connected"
+              ? notice
+              : `Starting in ${Math.ceil(hud.countdown)}`}
+          </p>
+        )}
+      <PlayTouchControls
+        left={driveKeys}
+        right={raceKeys}
+        disabled={!hud || hud.complete || !!error}
+        onKey={(key, down) => {
+          if (down) keys.current.add(key);
+          else keys.current.delete(key);
+        }}
+      />
+      {(!hud || hud.complete || error) && (
+        <div className="play-center" role={error ? "alert" : undefined}>
+          <h2>
+            {error
+              ? "Race unavailable"
+              : hud?.complete
+                ? "Race results"
+                : notice}
+          </h2>
+          {error && <p>{error}</p>}
+          {hud?.complete && (
+            <ol className="planet-scores">
+              {standings.map((car) => (
+                <li key={car.id}>
+                  <span style={{ color: car.color }}>{car.name}</span> ·{" "}
+                  {hud.withdrawn.includes(car.id) || car.finishedAt === null
+                    ? "DNF"
+                    : `${car.finishedAt.toFixed(2)}s`}
+                </li>
+              ))}
+            </ol>
+          )}
+          {error && (
+            <button
+              className="primary"
+              onClick={() => setAttempt((value) => value + 1)}
+            >
+              Reconnect
+            </button>
+          )}
+          {hud?.complete && (
+            <button className="primary" onClick={exit}>
+              Return to party
+            </button>
+          )}
+        </div>
+      )}
+    </PlayScreen>
   );
 }

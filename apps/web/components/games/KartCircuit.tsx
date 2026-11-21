@@ -16,6 +16,7 @@ import type { EngineProps } from "./PhaserArcade";
 import { createRaceView } from "./race-renderer";
 import type { RaceView } from "./race-canvas";
 import type { Replay } from "../../lib/racing-career";
+import { isGameInput } from "../PlayScreen";
 import type { RaceAudio } from "../../lib/race-audio";
 export type RaceHud = {
   speed: number;
@@ -53,7 +54,7 @@ export type RaceHud = {
     z: number;
   }[];
 };
-type Props = EngineProps & {
+type Props = EngineProps<{ score: number; detail: string; ended: boolean }> & {
   trackId?: TrackId;
   mode: RaceMode;
   difficulty: RaceDifficulty;
@@ -225,10 +226,12 @@ export default function KartCircuit({
       if (down) keys.add(code);
       else keys.delete(code);
       if (down && !already) {
+        callbacks.current.audio?.unlock();
         if (code === "KeyR") sim.recover();
       }
     };
     const keyDown = (event: KeyboardEvent) => {
+        if (!isGameInput(event)) return;
         if (event.repeat && event.code === "KeyP") return;
         if (
           ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(

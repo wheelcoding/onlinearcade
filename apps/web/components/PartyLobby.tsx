@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import {
-  Users,
   Gamepad2,
   Plus,
   ArrowUpRight,
@@ -34,14 +33,17 @@ export default function PartyLobby({
     [copied, setCopied] = useState(false),
     [draft, setDraft] = useState("");
   useEffect(() => {
-    const select = () => setPartyGame("party-planet");
-    window.addEventListener("oa:party-planet", select);
-    return () => window.removeEventListener("oa:party-planet", select);
-  }, []);
-  useEffect(() => {
-    const select = () => setPartyGame("boostball");
-    window.addEventListener("oa:boostball", select);
-    return () => window.removeEventListener("oa:boostball", select);
+    const select = (event: Event) => {
+      const game = (event as CustomEvent<unknown>).detail;
+      if (
+        game === "boostball" ||
+        game === "party-planet" ||
+        game === "kart-circuit"
+      )
+        setPartyGame(game);
+    };
+    window.addEventListener("oa:choose-party-game", select);
+    return () => window.removeEventListener("oa:choose-party-game", select);
   }, []);
   const messages = useRef<HTMLDivElement>(null),
     copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -85,17 +87,12 @@ export default function PartyLobby({
   return (
     <section id="multiplayer" className="multiplayer">
       <div className="party-intro">
-        <span className="eyebrow">
-          <Users size={15} /> THE MORE, THE MERRIER
-        </span>
-        <h2>
-          Same party.
-          <br />
-          <em>Different screens.</em>
+        <h2 id="party-heading" tabIndex={-1}>
+          Play with friends
         </h2>
         <p>
-          Create a private room. Share the code. Chat with your crew, race
-          Sunset Circuit together, or launch Neon Dash.
+          Create a private party and share its code. Chat in the lobby, then
+          race, play car soccer, or compete in Party Planet.
         </p>
         <div className="connection" role="status">
           <span className={`dot ${connected ? "" : "offline"}`} />
@@ -111,20 +108,6 @@ export default function PartyLobby({
                   ? "Reconnecting · server may be waking up…"
                   : "Connecting to the arcade…"}
           <span>• Up to 8 per party</span>
-        </div>
-        <div className="party-explainer">
-          <span>
-            01 <b>Invite</b>
-            <small>Private six-character room codes</small>
-          </span>
-          <span>
-            02 <b>Hang out</b>
-            <small>Party-only chat and ready checks</small>
-          </span>
-          <span>
-            03 <b>Play</b>
-            <small>Race on a shared track</small>
-          </span>
         </div>
         <p className="party-privacy">
           Guest names are not verified account identities. Chat is visible only

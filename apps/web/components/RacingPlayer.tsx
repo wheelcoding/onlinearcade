@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   TRACKS,
@@ -18,6 +18,14 @@ import type { GameControl } from "./games/PhaserArcade";
 import type { RaceHud } from "./games/KartCircuit";
 import { useAccount } from "./account/AccountProvider";
 import TrackMap from "./games/TrackMap";
+import { Pause, Play } from "lucide-react";
+import {
+  PlayOptions,
+  PlayScreen,
+  PlayTouchControls,
+  driveKeys,
+  raceKeys,
+} from "./PlayScreen";
 import { BrowserRaceRepository, formatRaceTime } from "../lib/race-records";
 import {
   PAINTS,
@@ -65,7 +73,7 @@ export default function RacingPlayer({
 }) {
   const cloud = useAccount();
   const [selected, setSelected] = useState<TrackId>("sunset-bay"),
-    [racing, setRacing] = useState(false),
+    [racing, setRacing] = useState(true),
     [quality, setQuality] = useState<"balanced" | "high">("balanced"),
     [localRecords, setRecords] = useState<RaceRecords>({}),
     [race, setRace] = useState(initialHud),
@@ -78,14 +86,13 @@ export default function RacingPlayer({
     [paused, setPaused] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
-    [help, setHelp] = useState(false),
     [isBest, setIsBest] = useState(false);
   const [mode, setMode] = useState<RaceMode>("grand-prix");
   const [difficulty, setDifficulty] = useState<RaceDifficulty>("rookie");
   const [career, setCareer] = useState(emptyCareer);
   const [line, setLine] = useState(true);
   const [muted, setMuted] = useState(false);
-  const audio = useRef<RaceAudio | null>(null);
+  const [audio, setAudio] = useState<RaceAudio | null>(null);
   useEffect(() => {
     try {
       setCareer(
@@ -98,12 +105,11 @@ export default function RacingPlayer({
       );
     }
   }, [cloud.user?.id]);
-  useEffect(
-    () => () => {
-      audio.current?.dispose();
-    },
-    [],
-  );
+  useEffect(() => {
+    const sound = createRaceAudio();
+    setAudio(sound);
+    return () => sound?.dispose();
+  }, []);
   function storeCareer(next: typeof career) {
     setCareer(next);
     try {
@@ -116,67 +122,36 @@ export default function RacingPlayer({
   }
   const stars = careerStars(career);
   const paint = PAINTS.find((p) => p.id === career.paint) || PAINTS[0];
-  const control = useRef<GameControl | null>(null),
-    dialog = useRef<HTMLDivElement>(null),
-    close = useRef(onClose);
-  close.current = onClose;
+  const control = useRef<GameControl | null>(null);
   const records = cloud.user ? cloud.raceRecords : localRecords;
   const track = getTrack(selected),
     record = records[selected],
-    samples = sampleTrack(track),
+    samples = useMemo(() => sampleTrack(track), [track]),
     elevations = samples.map((p) => p.y);
   useEffect(() => {
     try {
       setRecords(new BrowserRaceRepository(localStorage).load());
     } catch {}
-    const before = document.activeElement as HTMLElement | null,
-      overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialog.current?.focus();
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close.current();
-      if (e.key === "Tab") {
-        const nodes = dialog.current?.querySelectorAll<HTMLElement>(
-          "button:not([disabled]),select,input",
-        );
-        if (!nodes?.length) return;
-        const first = nodes[0],
-          last = nodes[nodes.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
     const hidden = () => {
       if (document.hidden && control.current) {
         control.current.pause(true);
         setPaused(true);
       }
     };
-    window.addEventListener("keydown", key);
     document.addEventListener("visibilitychange", hidden);
     return () => {
-      window.removeEventListener("keydown", key);
       document.removeEventListener("visibilitychange", hidden);
-      document.body.style.overflow = overflow;
-      before?.focus();
     };
   }, []);
   function start() {
-    audio.current ??= createRaceAudio();
-    audio.current?.unlock();
-    audio.current?.setMuted(muted);
+    audio?.unlock();
+    audio?.setMuted(muted);
     setError("");
     setPaused(false);
     setResult(null);
     setRace(initialHud);
     setHud({ score: 0, detail: "Loading course…", ended: false });
     setRacing(true);
-    dialog.current?.focus();
   }
   function restart() {
     setPaused(false);
@@ -213,58 +188,66 @@ export default function RacingPlayer({
     }
   }
   return (
-    <div className="modal racing-modal">
-      <div
-        className="game-dialog racing-dialog"
-        ref={dialog}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Sunset Circuit racing"
-        tabIndex={-1}
-      >
-        <div className="race-heading">
-          <div>
-            <span className="eyebrow">ONLINEARCADE ORIGINAL · KART RACING</span>
-            <h2>
-              Sunset Circuit<span className="race-edition">WORLD TOUR</span>
-            </h2>
-          </div>
-          <div className="race-heading-actions">
-            {racing && (
+    <PlayScreen
+      name="Sunset Circuit"
+      className={racing ? "play-race" : "play-garage"}
+      onExit={onClose}
+      tools={
+        racing && (
+          <>
+            <button
+              className="play-icon"
+              aria-label={paused ? "Resume race" : "Pause race"}
+              disabled={!control.current || hud.ended || !!error}
+              onClick={togglePause}
+            >
+              {paused ? <Play size={18} /> : <Pause size={18} />}
+            </button>
+            <PlayOptions>
+              <p>
+                <strong>Sunset Circuit · {track.name}</strong>
+              </p>
+              <p>
+                WASD or arrows to drive. Shift boosts. Hold Space to drift and
+                release for turbo. P pauses.
+              </p>
+              <button onClick={() => setRacing(false)}>
+                Choose track and mode
+              </button>
+              <button disabled={!!error} onClick={restart}>
+                Restart race
+              </button>
               <button
+                disabled={paused || hud.ended || !!error}
                 onClick={() => {
-                  setRacing(false);
-                  setPaused(false);
-                  setError("");
+                  control.current?.key("KeyR", true);
+                  control.current?.key("KeyR", false);
                 }}
               >
-                ← Tracks
+                Recover kart (+2s)
               </button>
-            )}
-            <button onClick={onClose} aria-label="Close racing game">
-              ✕
-            </button>
-          </div>
-        </div>
-        {!racing ? (
+              <button aria-pressed={line} onClick={() => setLine(!line)}>
+                Racing line {line ? "on" : "off"}
+              </button>
+              <button
+                aria-pressed={muted}
+                onClick={() => {
+                  audio?.unlock();
+                  audio?.setMuted(!muted);
+                  setMuted(!muted);
+                }}
+              >
+                {muted ? "Turn sound on" : "Mute sound"}
+              </button>
+            </PlayOptions>
+          </>
+        )
+      }
+    >
+      {!racing ? (
+        <>
+          <h1>Sunset Circuit</h1>
           <div className="race-garage">
-            <div className="garage-intro">
-              <div>
-                <span className="eyebrow">
-                  FOUR DESTINATIONS. FIVE DRIVERS. ONE PODIUM.
-                </span>
-                <h3>Earn your place on the grid.</h3>
-                <p>
-                  Brake into the bend. Hold a drift. Release a turbo. Make the
-                  overtake.
-                </p>
-              </div>
-              <span className="garage-stamp">
-                4 TRACKS
-                <br />
-                <b>3 LAPS</b>
-              </span>
-            </div>
             <div className="tour-setup">
               <div className="mode-picker" aria-label="Race mode">
                 {(["grand-prix", "time-trial"] as const).map((m) => (
@@ -323,7 +306,7 @@ export default function RacingPlayer({
               </div>
             </div>
             <div className="track-grid">
-              {TRACKS.map((t, i) => (
+              {TRACKS.map((t) => (
                 <button
                   key={t.id}
                   className={`track-card biome-${t.biome} ${selected === t.id ? "selected" : ""}`}
@@ -332,7 +315,6 @@ export default function RacingPlayer({
                 >
                   <div className="track-card-visual">
                     <div className="track-sky-orb" />
-                    <span className="track-number">0{i + 1}</span>
                     <span className="track-difficulty">{t.difficulty}</span>
                     <TrackMap track={t} />
                     <span className="track-biome">
@@ -396,7 +378,7 @@ export default function RacingPlayer({
                   </select>
                 </label>
                 <button className="primary" onClick={start}>
-                  Start your engines <span>↗</span>
+                  Start race
                 </button>
               </div>
             </div>
@@ -419,13 +401,13 @@ export default function RacingPlayer({
             )}
             <div className="driving-primer">
               <span>
-                <b>01 · BRAKE</b>Slow before a tight corner.
+                <b>Brake</b>Slow before a tight corner.
               </span>
               <span>
-                <b>02 · DRIFT</b>Hold Space / Z while steering.
+                <b>Drift</b>Hold Space / Z while steering.
               </span>
               <span>
-                <b>03 · RELEASE</b>Orange charge = turbo. Purple = super.
+                <b>Release</b>Orange charge = turbo. Purple = super.
               </span>
             </div>
             <label className="race-assist">
@@ -444,331 +426,254 @@ export default function RacingPlayer({
                 : "stay local; sign in from My profile for cross-device records."}
             </p>
           </div>
-        ) : (
-          <>
-            <div className="engine-stage racing-stage">
-              <Kart
-                gameId="sunset-circuit"
-                trackId={selected}
-                quality={quality}
-                onScore={onScore}
-                onHud={setHud}
-                onError={setError}
-                control={control}
-                mode={mode}
-                difficulty={difficulty}
-                paint={paint.color}
-                ghostReplay={career.ghosts[selected] || null}
-                racingLine={line}
-                audio={audio.current}
-                onPauseRequest={(toggle = false) => {
-                  setPaused((prev) => {
-                    const next = toggle ? !prev : true;
-                    control.current?.pause(next);
-                    return next;
-                  });
-                }}
-                onTourFinish={finish}
-                onRaceHud={setRace}
-              />
-              <div className="race-top-hud">
-                <div className="race-lap-badge">
-                  <small>{track.name.toUpperCase()}</small>
-                  <strong>
-                    LAP {race.lap}
-                    <span> / 3</span>
-                  </strong>
-                  <span>{race.checkpoint + 1} / 24 gates</span>
-                </div>
-                <div className="race-timing">
-                  <span>
-                    RACE <b>{formatRaceTime(Math.max(1, race.elapsedMs))}</b>
-                  </span>
-                  <span>
-                    THIS LAP <b>{formatRaceTime(race.lapMs)}</b>
-                  </span>
-                  <span>
-                    BEST LAP{" "}
-                    <b>
-                      {formatRaceTime(race.bestLapMs || record?.bestLapMs || 0)}
-                    </b>
-                  </span>
-                </div>
-              </div>
-              {mode === "grand-prix" && (
-                <div className="race-standings">
-                  <b>
-                    P{race.position}
-                    <small> / 5</small>
-                  </b>
-                  {race.standings.map((c) => (
-                    <div key={c.id} className={c.id === 0 ? "you" : ""}>
-                      <span style={{ color: c.color }}>
-                        {c.position} {c.name}
-                        {c.id ? " · AI" : ""}
-                      </span>
-                      <span>{c.id ? `${Math.abs(c.gap)}m` : "YOU"}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {race.ghostDelta !== null && (
-                <div
-                  className={`ghost-delta ${race.ghostDelta < 0 ? "ahead" : ""}`}
-                >
-                  {race.ghostDelta > 0 ? "+" : ""}
-                  {race.ghostDelta.toFixed(2)}s <small>VS PERSONAL GHOST</small>
-                </div>
-              )}
-              <div className="race-feedback" role="status">
-                {race.wrongWay
-                  ? "WRONG WAY · TURN AROUND"
-                  : race.cue ||
-                    (race.brakeHint ? "BRAKE BEFORE THE CORNER" : "")}
-              </div>
-              <div className="race-minimap">
-                <TrackMap
-                  track={track}
-                  position={{ x: race.x, z: race.z }}
-                  rivals={race.standings.filter((c) => c.id !== 0)}
-                  small
+        </>
+      ) : (
+        <>
+          <div tabIndex={-1} className="play-field racing-stage">
+            <Kart
+              gameId="sunset-circuit"
+              trackId={selected}
+              quality={quality}
+              onScore={onScore}
+              onHud={setHud}
+              onError={setError}
+              control={control}
+              mode={mode}
+              difficulty={difficulty}
+              paint={paint.color}
+              ghostReplay={career.ghosts[selected] || null}
+              racingLine={line}
+              audio={audio}
+              onPauseRequest={(toggle = false) => {
+                setPaused((prev) => {
+                  const next = toggle ? !prev : true;
+                  control.current?.pause(next);
+                  return next;
+                });
+              }}
+              onTourFinish={finish}
+              onRaceHud={setRace}
+            />
+            <div className="race-top-hud">
+              <div className="race-lap-badge">
+                <small>{track.name}</small>
+                <strong>
+                  LAP {race.lap}
+                  <span> / 3</span>
+                </strong>
+                <progress
+                  className="play-meter"
+                  aria-label="Lap gate progress"
+                  max={24}
+                  value={race.checkpoint}
                 />
               </div>
-              <div className="race-bottom-hud">
-                <div className="race-speed">
-                  <strong>{race.speed.toString().padStart(3, "0")}</strong>
-                  <span>KM/H · GEAR {race.gear}</span>
-                </div>
-                <div className="race-boost">
-                  <span>
-                    BOOST <b>SHIFT</b>
-                  </span>
-                  <progress
-                    max="100"
-                    value={race.boost}
-                    aria-label="Boost energy"
-                  />
-                </div>
-                <div className={`race-drift ${race.drifting ? "active" : ""}`}>
-                  <span>
-                    {race.turbo
-                      ? "TURBO!"
-                      : race.driftCharge > 2.3
-                        ? "SUPER TURBO READY · RELEASE"
-                        : race.driftCharge > 1.1
-                          ? "TURBO READY · RELEASE"
-                          : "DRIFT · SPACE / Z"}
-                  </span>
-                  <progress
-                    value={race.driftCharge}
-                    max={2.3}
-                    aria-label="Drift charge"
-                  />
-                </div>
-                {race.offRoad && (
-                  <span className="offroad-label">SHOULDER — SLOW DOWN</span>
-                )}
-              </div>
-              {race.countdown > 0 && !paused && !error && (
-                <div className="race-countdown">
-                  <span>
-                    {hud.detail === "Loading course…"
-                      ? "BUILDING YOUR WORLD"
-                      : "GET READY"}
-                  </span>
-                  <strong>
-                    {hud.detail === "Loading course…" ? "…" : race.countdown}
-                  </strong>
-                </div>
-              )}
-              {(paused || hud.ended || error) && (
-                <div className="engine-overlay race-end">
-                  <span className="eyebrow">
-                    {error
-                      ? "ENGINE NOTICE"
-                      : hud.ended
-                        ? isBest
-                          ? "NEW PERSONAL BEST"
-                          : "CHEQUERED FLAG"
-                        : "PIT STOP"}
-                  </span>
-                  <h2>
-                    {error
-                      ? "Track unavailable"
-                      : hud.ended
-                        ? track.name
-                        : "Race paused"}
-                  </h2>
-                  {hud.ended && result ? (
-                    <>
-                      <strong>
-                        {mode === "grand-prix"
-                          ? `P${result.place} · ${formatRaceTime(result.result.durationMs)}`
-                          : formatRaceTime(result.result.durationMs)}
-                      </strong>
-                      <div className="finish-stats">
-                        <span>
-                          BEST LAP{" "}
-                          <b>{formatRaceTime(result.result.bestLapMs)}</b>
-                        </span>
-                        <span>
-                          POINTS <b>{result.result.score.toLocaleString()}</b>
-                        </span>
-                      </div>
-                      <div className="tour-result">
-                        <p className="race-coach">
-                          {result.collisions > 3
-                            ? "Next run: brake earlier and leave room on corner exits."
-                            : result.drifts === 0
-                              ? "Next run: try holding a drift through a long corner, then release for turbo."
-                              : result.recoveries > 0
-                                ? "Next run: stay on track and avoid the two-second recovery penalty."
-                                : "Clean work. Try the next AI pace or chase a faster ghost."}
-                        </p>
-                        <div className="podium-stars">
-                          {"★".repeat(result.medal)}
-                          {"☆".repeat(3 - result.medal)}
-                        </div>
-                        <p>
-                          {mode === "grand-prix"
-                            ? `${stars}/12 career stars · earn podiums to unlock paints`
-                            : "Race your personal ghost next time. Clean runs save a replay."}
-                        </p>
-                        <div>
-                          {result.lapTimes.map((t, i) => (
-                            <span key={i}>
-                              LAP {i + 1} <b>{formatRaceTime(t)}</b>
-                            </span>
-                          ))}
-                        </div>
-                        <p>
-                          {result.drifts} turbos · {result.collisions} contacts
-                          · {result.recoveries} recoveries · {result.maxSpeed}{" "}
-                          km/h top speed
-                        </p>
-                      </div>
-                    </>
-                  ) : (
-                    <p>{error || "Your race clock is paused."}</p>
-                  )}
-                  <div className="race-end-actions">
-                    {!error && (
-                      <button
-                        className="primary"
-                        onClick={hud.ended ? restart : togglePause}
-                      >
-                        {hud.ended ? "Race again ↻" : "Resume ▷"}
-                      </button>
-                    )}
-                    <button
-                      className="secondary"
-                      onClick={() => {
-                        setRacing(false);
-                        setPaused(false);
-                        setError("");
-                      }}
-                    >
-                      Choose another track
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="race-toolbar">
-              <span className="race-condition">{hud.detail}</span>
-              <div>
-                <button
-                  disabled={
-                    hud.ended || !!error || hud.detail === "Loading course…"
-                  }
-                  onClick={togglePause}
-                >
-                  {paused ? "▷ Resume" : "Ⅱ Pause"}
-                </button>
-                <button disabled={!!error} onClick={restart}>
-                  ↻ Restart
-                </button>
-                <button
-                  onClick={() => {
-                    setMuted(!muted);
-                    audio.current?.setMuted(!muted);
-                  }}
-                  aria-pressed={muted}
-                >
-                  {muted ? "Sound off" : "Sound on"}
-                </button>
-                <button
-                  disabled={paused || hud.ended}
-                  onClick={() => {
-                    control.current?.key("KeyR", true);
-                    control.current?.key("KeyR", false);
-                  }}
-                >
-                  Recover +2s
-                </button>
-                <button onClick={() => setHelp(!help)} aria-expanded={help}>
-                  ? Controls
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      if (document.fullscreenElement)
-                        await document.exitFullscreen();
-                      else await dialog.current?.requestFullscreen();
-                    } catch {
-                      setNotice("Fullscreen is unavailable in this browser.");
-                    }
-                  }}
-                >
-                  ⛶
-                </button>
+              <div className="race-timing">
+                <span>
+                  RACE <b>{formatRaceTime(Math.max(1, race.elapsedMs))}</b>
+                </span>
+                <span>
+                  THIS LAP <b>{formatRaceTime(race.lapMs)}</b>
+                </span>
+                <span>
+                  BEST LAP{" "}
+                  <b>
+                    {formatRaceTime(race.bestLapMs || record?.bestLapMs || 0)}
+                  </b>
+                </span>
               </div>
             </div>
-            {help && (
-              <div className="game-instructions">
+            {mode === "grand-prix" && (
+              <div className="race-standings">
                 <b>
-                  W / ↑ gas · S / ↓ brake · A / ← left · D / → right · Shift
-                  boost · Space / Z drift · R recover (+2 seconds) · P pause
+                  P{race.position}
+                  <small> / 5</small>
                 </b>
-                <p>
-                  Complete three laps. Brake before tight bends. Hold drift
-                  while steering, then release after the charge turns orange for
-                  a mini-turbo or purple for a super turbo. Boost recharges when
-                  released. The striped acceleration pads also add speed.
-                  Recovery returns you to your latest checkpoint.
-                </p>
+                {race.standings.map((c) => (
+                  <div key={c.id} className={c.id === 0 ? "you" : ""}>
+                    <span style={{ color: c.color }}>
+                      {c.position} {c.name}
+                      {c.id ? " · AI" : ""}
+                    </span>
+                    <span>{c.id ? `${Math.abs(c.gap)}m` : "YOU"}</span>
+                  </div>
+                ))}
               </div>
             )}
-            <div className="touch-controls suite-controls race-touch">
-              {[
-                ["ArrowLeft", "← LEFT"],
-                ["ArrowRight", "RIGHT →"],
-                ["ArrowUp", "GAS ↑"],
-                ["ArrowDown", "BRAKE ↓"],
-                ["ShiftLeft", "BOOST ⚡"],
-                ["Space", "DRIFT ◇"],
-              ].map(([key, label]) => (
-                <button
-                  key={key}
-                  onPointerDown={(e) => {
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                    control.current?.key(key, true);
-                  }}
-                  onPointerUp={() => control.current?.key(key, false)}
-                  onPointerCancel={() => control.current?.key(key, false)}
-                >
-                  {label}
-                </button>
-              ))}
+            {race.ghostDelta !== null && (
+              <div
+                className={`ghost-delta ${race.ghostDelta < 0 ? "ahead" : ""}`}
+              >
+                {race.ghostDelta > 0 ? "+" : ""}
+                {race.ghostDelta.toFixed(2)}s <small>VS PERSONAL GHOST</small>
+              </div>
+            )}
+            <div className="race-feedback" role="status">
+              {race.wrongWay
+                ? "WRONG WAY · TURN AROUND"
+                : race.cue || (race.brakeHint ? "BRAKE BEFORE THE CORNER" : "")}
             </div>
-          </>
-        )}
-        {notice && (
-          <p className="error" role="status">
-            {notice}
-          </p>
-        )}
-      </div>
-    </div>
+            <div className="race-minimap">
+              <TrackMap
+                track={track}
+                position={{ x: race.x, z: race.z }}
+                rivals={race.standings.filter((c) => c.id !== 0)}
+                small
+              />
+            </div>
+            <div className="race-bottom-hud">
+              <div className="race-speed">
+                <strong>{race.speed.toString().padStart(3, "0")}</strong>
+                <span>KM/H · GEAR {race.gear}</span>
+              </div>
+              <div className="race-boost">
+                <span>
+                  BOOST <b>SHIFT</b>
+                </span>
+                <progress
+                  max="100"
+                  value={race.boost}
+                  aria-label="Boost energy"
+                />
+              </div>
+              <div className={`race-drift ${race.drifting ? "active" : ""}`}>
+                <span>
+                  {race.turbo
+                    ? "TURBO!"
+                    : race.driftCharge > 2.3
+                      ? "SUPER TURBO READY · RELEASE"
+                      : race.driftCharge > 1.1
+                        ? "TURBO READY · RELEASE"
+                        : "DRIFT · SPACE / Z"}
+                </span>
+                <progress
+                  value={race.driftCharge}
+                  max={2.3}
+                  aria-label="Drift charge"
+                />
+              </div>
+              {race.offRoad && (
+                <span className="offroad-label">SHOULDER — SLOW DOWN</span>
+              )}
+            </div>
+            {race.countdown > 0 && !paused && !error && (
+              <div className="race-countdown">
+                <span>
+                  {hud.detail === "Loading course…"
+                    ? "BUILDING YOUR WORLD"
+                    : "GET READY"}
+                </span>
+                <strong>
+                  {hud.detail === "Loading course…" ? "…" : race.countdown}
+                </strong>
+              </div>
+            )}
+            {(paused || hud.ended || error) && (
+              <div className="engine-overlay race-end">
+                <span className="eyebrow">
+                  {error
+                    ? "ENGINE NOTICE"
+                    : hud.ended
+                      ? isBest
+                        ? "NEW PERSONAL BEST"
+                        : "CHEQUERED FLAG"
+                      : "PIT STOP"}
+                </span>
+                <h2>
+                  {error
+                    ? "Track unavailable"
+                    : hud.ended
+                      ? track.name
+                      : "Race paused"}
+                </h2>
+                {hud.ended && result ? (
+                  <>
+                    <strong>
+                      {mode === "grand-prix"
+                        ? `P${result.place} · ${formatRaceTime(result.result.durationMs)}`
+                        : formatRaceTime(result.result.durationMs)}
+                    </strong>
+                    <div className="finish-stats">
+                      <span>
+                        BEST LAP{" "}
+                        <b>{formatRaceTime(result.result.bestLapMs)}</b>
+                      </span>
+                      <span>
+                        POINTS <b>{result.result.score.toLocaleString()}</b>
+                      </span>
+                    </div>
+                    <div className="tour-result">
+                      <p className="race-coach">
+                        {result.collisions > 3
+                          ? "Next run: brake earlier and leave room on corner exits."
+                          : result.drifts === 0
+                            ? "Next run: try holding a drift through a long corner, then release for turbo."
+                            : result.recoveries > 0
+                              ? "Next run: stay on track and avoid the two-second recovery penalty."
+                              : "Clean work. Try the next AI pace or chase a faster ghost."}
+                      </p>
+                      <div className="podium-stars">
+                        {"★".repeat(result.medal)}
+                        {"☆".repeat(3 - result.medal)}
+                      </div>
+                      <p>
+                        {mode === "grand-prix"
+                          ? `${stars}/12 career stars · earn podiums to unlock paints`
+                          : "Race your personal ghost next time. Clean runs save a replay."}
+                      </p>
+                      <div>
+                        {result.lapTimes.map((t, i) => (
+                          <span key={i}>
+                            LAP {i + 1} <b>{formatRaceTime(t)}</b>
+                          </span>
+                        ))}
+                      </div>
+                      <p>
+                        {result.drifts} turbos · {result.collisions} contacts ·{" "}
+                        {result.recoveries} recoveries · {result.maxSpeed} km/h
+                        top speed
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <p>{error || "Your race clock is paused."}</p>
+                )}
+                <div className="race-end-actions">
+                  {!error && (
+                    <button
+                      className="primary"
+                      onClick={hud.ended ? restart : togglePause}
+                    >
+                      {hud.ended ? "Race again ↻" : "Resume ▷"}
+                    </button>
+                  )}
+                  <button
+                    className="secondary"
+                    onClick={() => {
+                      setRacing(false);
+                      setPaused(false);
+                      setError("");
+                    }}
+                  >
+                    Choose another track
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          <PlayTouchControls
+            left={driveKeys}
+            right={raceKeys}
+            disabled={paused || hud.ended || !!error || !control.current}
+            onKey={(key, down) => control.current?.key(key, down)}
+          />
+        </>
+      )}
+      {notice && (
+        <p className="play-message" role="status">
+          {notice}
+        </p>
+      )}
+    </PlayScreen>
   );
 }

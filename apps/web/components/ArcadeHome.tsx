@@ -8,7 +8,12 @@ import {
   type GameId,
   type LocalProgress,
 } from "@onlinearcade/core";
-import { games, gameById, rankedGames } from "../lib/catalog";
+import {
+  games,
+  gameById,
+  rankedGames,
+  type GameDefinition,
+} from "../lib/catalog";
 import { BrowserProgressRepository } from "../lib/progress";
 import GameArtwork from "../components/GameArtwork";
 import AccountProvider, { useAccount } from "./account/AccountProvider";
@@ -20,47 +25,54 @@ import {
   Heart,
   Gamepad2,
   ArrowUpRight,
-  ArrowRight,
   Users,
   Trophy,
   Zap,
   Search,
-  ChevronRight,
   Flag,
   Crosshair,
   Footprints,
   PartyPopper,
   Puzzle,
   Joystick,
-  Check,
+  Play,
 } from "lucide-react";
-const Cloudbound = dynamic(() => import("../components/Cloudbound"), {
-  ssr: false,
-  loading: () => (
-    <div className="modal">
-      <div className="game-dialog" role="status">
-        Preparing Cloudbound…
-      </div>
+function LoadingGame() {
+  return (
+    <div className="play-loading" role="status">
+      Loading game…
     </div>
-  ),
-});
-const Boostball = dynamic(() => import("../components/Boostball"), {
+  );
+}
+const Cloudbound = dynamic(() => import("./Cloudbound"), {
   ssr: false,
+  loading: LoadingGame,
 });
-const PartyPlanet = dynamic(() => import("../components/PartyPlanet"), {
+const Boostball = dynamic(() => import("./Boostball"), {
   ssr: false,
+  loading: LoadingGame,
 });
-const OnlineKart = dynamic(() => import("../components/OnlineKart"), {
+const PartyPlanet = dynamic(() => import("./PartyPlanet"), {
   ssr: false,
+  loading: LoadingGame,
 });
-const NeonDash = dynamic(() => import("../components/NeonDash"), {
+const OnlineKart = dynamic(() => import("./OnlineKart"), {
   ssr: false,
-  loading: () => <div className="modal">Loading game…</div>,
+  loading: LoadingGame,
 });
-const GamePlayer = dynamic(() => import("../components/GamePlayer"), {
+const GamePlayer = dynamic(() => import("./GamePlayer"), {
   ssr: false,
-  loading: () => <div className="modal">Loading game engine…</div>,
+  loading: LoadingGame,
 });
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+const partyGames = {
+  boostball: "boostball",
+  "party-planet": "party-planet",
+  "sunset-circuit": "kart-circuit",
+} as const;
+const isPartyGame = (id: GameDefinition["id"]): id is keyof typeof partyGames =>
+  id in partyGames;
+
 const categories = [
   ["All games", Gamepad2],
   ["Racing", Flag],
@@ -72,16 +84,13 @@ const categories = [
 ] as const;
 function ArcadeContent() {
   const cloud = useAccount();
-  const [planetOpen, setPlanetOpen] = useState(false);
-  const [ballOpen, setBallOpen] = useState(false);
-  const [cloudOpen, setCloudOpen] = useState(false);
   const [onlineRace, setOnlineRace] = useState<OnlineRaceLink | null>(null);
   const [boardMode, setBoardMode] = useState<"local" | "community">(
     "community",
   );
   const [category, setCategory] = useState("All games"),
     [query, setQuery] = useState(""),
-    [playing, setPlaying] = useState<GameId | null>(null),
+    [playing, setPlaying] = useState<GameDefinition["id"] | null>(null),
     [profile, setProfile] = useState(false),
     [guestName, setGuestName] = useState("Player"),
     [progress, setProgress] = useState<LocalProgress>(emptyProgress),
@@ -122,205 +131,218 @@ function ArcadeContent() {
       );
     }
   }
+  const search = query.trim().toLowerCase();
   const filtered = games.filter(
-    (g) =>
-      (category === "All games" || g.category === category) &&
-      g.title.toLowerCase().includes(query.toLowerCase()),
+    (game) =>
+      (category === "All games" || game.category === category) &&
+      `${game.title} ${game.category} ${game.desc}`
+        .toLowerCase()
+        .includes(search),
   );
+  const closeGame = () => {
+    setPlaying(null);
+    setOnlineRace(null);
+  };
+  const chooseParty = (game: keyof typeof partyGames) => {
+    closeGame();
+    window.dispatchEvent(
+      new CustomEvent("oa:choose-party-game", { detail: partyGames[game] }),
+    );
+    requestAnimationFrame(() => {
+      const heading = document.getElementById("party-heading");
+      heading?.focus({ preventScroll: true });
+      document
+        .getElementById("multiplayer")
+        ?.scrollIntoView({ block: "start" });
+    });
+  };
+  const personal = (cloud.user ? cloud.progress : progress).games;
   return (
     <>
-      <header>
-        <a className="brand" href="#home">
+      <header className="arcade-header">
+        <a className="brand" href="#home" aria-label="OnlineArcade home">
           <span className="brand-icon">
-            <Gamepad2 size={25} />
+            <Gamepad2 size={21} aria-hidden="true" />
           </span>
           online<span>arcade</span>
-          <i>®</i>
         </a>
         <nav aria-label="Main navigation">
-          <a className="active" href="#home">
-            Home
-          </a>
+          <a href="#home">Home</a>
           <a href="#games">Games</a>
           <a href="#multiplayer">Multiplayer</a>
           <a href="#leaderboards">Leaderboards</a>
         </nav>
-        <button className="profile" onClick={() => setProfile(true)}>
-          <span className="avatar">{name.slice(0, 1).toUpperCase()}</span>
+        <button
+          className="profile"
+          onClick={() => setProfile(true)}
+          aria-label={cloud.user ? "My account" : "Sign in or view profile"}
+        >
+          <span className="avatar" aria-hidden="true">
+            {name.slice(0, 1).toUpperCase()}
+          </span>
           <span>
             {cloud.user
               ? "My account"
               : cloud.configured
-                ? "Sign in / Profile"
-                : "My profile"}
+                ? "Sign in"
+                : "Profile"}
           </span>
-          <ChevronRight size={15} />
         </button>
       </header>
-      <main id="home">
-        <section className="hero">
-          <div className="hero-copy">
-            <span className="pill">
-              <span className="dot" /> YOUR NEXT HIGH SCORE STARTS HERE
-            </span>
-            <h1>
-              Less waiting.
-              <br />
-              <em>More playing.</em>
-              <span className="spark">✳</span>
+      <main id="home" className="arcade-home">
+        <section className="arcade-hero" aria-labelledby="arcade-title">
+          <img
+            className="arcade-hero-art"
+            src={`${basePath}/art/boostball-stadium.webp`}
+            alt=""
+            width={1536}
+            height={1024}
+            fetchPriority="high"
+          />
+          <div className="arcade-hero-copy">
+            <h1 id="arcade-title">
+              <span>Welcome to</span>OnlineArcade
             </h1>
-            <p>
-              Your arcade. Your friends. Your games. Eight original worlds, one
-              more round.
-            </p>
+            <p>Your arcade. Your friends. Your games.</p>
             <div className="hero-actions">
               <button
                 className="primary"
-                onClick={() => setPlaying("neon-dash")}
+                onClick={() => setPlaying("boostball")}
               >
-                <Gamepad2 size={19} /> Play Now <ArrowUpRight size={18} />
+                <Play size={18} fill="currentColor" aria-hidden="true" /> Play
+                Boostball
               </button>
               <a className="secondary" href="#games">
-                Browse Games <ArrowRight size={18} />
+                Browse games
               </a>
             </div>
-            <div className="hero-note">
-              <span>
-                <Check size={14} /> Free to play
-              </span>
-              <span>
-                <Check size={14} /> No downloads
-              </span>
-              <span>
-                <Check size={14} /> Just good games
-              </span>
-            </div>
           </div>
-          <button
-            className="featured-world"
-            onClick={() => setPlaying("sunset-circuit")}
-            aria-label="Play Sunset Circuit kart racing"
-          >
-            <GameArtwork game={gameById("sunset-circuit")} />
-            <div className="featured-top">
-              <span className="pill">
-                <span className="dot" /> NEW WORLD UNLOCKED
-              </span>
-              <span className="dimension-badge">3D</span>
-            </div>
-            <div className="featured-bottom">
-              <span className="eyebrow">TAKE THE SCENIC ROUTE</span>
-              <h2>Sunset Circuit</h2>
-              <p>Four circuits. Five drivers. Earn your podium.</p>
-              <span className="featured-play">
-                Jump in <ArrowUpRight size={18} />
-              </span>
-            </div>
-          </button>
+          <div className="arcade-hero-caption">
+            <span className="arcade-feature-mark" aria-hidden="true">
+              <Gamepad2 size={18} />
+            </span>
+            <span>
+              <strong>Boostball</strong>
+              <small>3D car soccer · 2–8 online</small>
+            </span>
+          </div>
         </section>
-        <div className="ticker">
-          <span>
-            <Zap size={17} /> INSTANT PLAY
-          </span>
-          <i>✦</i>
-          <span>BIG FUN. ZERO DOWNLOADS.</span>
-          <i>✦</i>
-          <span>
-            <Users size={18} /> YOUR NEXT HANGOUT
-          </span>
-          <i>✦</i>
-          <span>MADE FOR ONE MORE ROUND</span>
-          <i>✦</i>
-        </div>
-        <section id="games" className="library">
-          <div className="section-heading">
+        <section id="games" className="library arcade-library">
+          <div className="section-heading arcade-library-heading">
             <div>
-              <span className="eyebrow">FIND YOUR NEXT FAVORITE</span>
-              <h2>
-                Pick your playground<span>.</span>
-              </h2>
+              <h2>Game library</h2>
+              <p role="status">
+                {filtered.length} {filtered.length === 1 ? "game" : "games"}
+              </p>
             </div>
-            <label className="search">
-              <Search size={17} />
+            <label className="search arcade-search">
+              <Search size={18} aria-hidden="true" />
               <input
-                placeholder="Search games…"
+                type="search"
+                placeholder="Search games"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(event) => setQuery(event.target.value)}
                 aria-label="Search games"
               />
-              <kbd>⌕</kbd>
             </label>
           </div>
-          <div className="categories">
+          <div
+            className="categories arcade-categories"
+            aria-label="Game categories"
+          >
             {categories.map(([label, Icon]) => (
               <button
                 key={label}
                 className={category === label ? "selected" : ""}
+                aria-pressed={category === label}
                 onClick={() => setCategory(label)}
               >
-                <Icon size={17} />
-                {label}
+                <Icon size={16} aria-hidden="true" /> {label}
               </button>
             ))}
           </div>
-          <div className="game-grid">
-            {filtered.map((g) => (
-              <article className="game-card" key={g.title}>
-                <div className={`thumbnail ${g.art}`}>
-                  <span className={`game-tag ${g.playable ? "ready" : ""}`}>
-                    {g.tag}
-                  </span>
-                  <GameArtwork game={g} />
-                  <span className="game-type">{g.type}</span>
-                </div>
-                <div className="game-info">
-                  <span className="game-category">{g.category}</span>
-                  <h3>{g.title}</h3>
-                  <p>{g.desc}</p>
-                  <div className="game-footer">
-                    <span>
-                      {g.playable
-                        ? g.id === "cloudbound"
-                          ? "↗ Climb to your personal best"
-                          : g.id === "party-planet" || g.id === "boostball"
-                            ? "↗ Practice or play with friends"
-                            : "↗ Chase your personal best"
-                        : "Something good is on the way"}
-                    </span>
-                    {g.playable ? (
-                      <button
-                        onClick={() =>
-                          g.id === "cloudbound"
-                            ? setCloudOpen(true)
-                            : g.id === "boostball"
-                              ? setBallOpen(true)
-                              : g.id === "party-planet"
-                                ? setPlanetOpen(true)
-                                : setPlaying(g.id as GameId)
-                        }
-                        aria-label={`Play ${g.title}`}
-                      >
-                        Play <ArrowUpRight size={16} />
-                      </button>
+          <div className="game-grid arcade-grid">
+            {filtered.map((game) => {
+              const stats = rankedGames.some((ranked) => ranked.id === game.id)
+                ? personal[game.id as GameId]
+                : null;
+              return (
+                <article className="game-card arcade-card" key={game.id}>
+                  <div className={`thumbnail ${game.art}`}>
+                    {game.id === "boostball" ? (
+                      <img
+                        className="game-artwork"
+                        src={`${basePath}/art/boostball-cover.webp`}
+                        width={640}
+                        height={426}
+                        loading="lazy"
+                        alt="Blue and orange cars in Boostball's stadium"
+                      />
                     ) : (
-                      <span className="coming">Coming soon</span>
+                      <GameArtwork game={game} />
                     )}
+                    <span className="game-type">{game.type}</span>
                   </div>
-                </div>
-              </article>
-            ))}
+                  <div className="game-info">
+                    <div className="arcade-card-heading">
+                      <h3>{game.title}</h3>
+                      <span className="game-category">{game.category}</span>
+                    </div>
+                    <p>{game.desc}</p>
+                    {stats?.runs ? (
+                      <small className="arcade-card-best">
+                        <Trophy size={13} /> Best {stats.best.toLocaleString()}
+                      </small>
+                    ) : null}
+                    <div className="arcade-card-actions">
+                      {game.playable ? (
+                        <button
+                          className="arcade-card-play"
+                          onClick={() => setPlaying(game.id)}
+                          aria-label={`Play ${game.title}`}
+                        >
+                          <Play
+                            size={14}
+                            fill="currentColor"
+                            aria-hidden="true"
+                          />{" "}
+                          Play
+                        </button>
+                      ) : (
+                        <span className="coming">Coming soon</span>
+                      )}
+                      {isPartyGame(game.id) && (
+                        <button
+                          className="arcade-card-friends"
+                          aria-label={`Play ${game.title} with friends`}
+                          onClick={() => {
+                            if (isPartyGame(game.id)) chooseParty(game.id);
+                          }}
+                        >
+                          <Users size={15} aria-hidden="true" /> Friends
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
           {!filtered.length && (
-            <div className="empty">
-              No{" "}
-              {category === "All games" ? "matching" : category.toLowerCase()}{" "}
-              games available yet. Try another category.
+            <div className="empty arcade-empty">
+              <Search size={22} aria-hidden="true" />
+              <strong>No games found</strong>
+              <button
+                className="secondary"
+                onClick={() => {
+                  setQuery("");
+                  setCategory("All games");
+                }}
+              >
+                Clear filters
+              </button>
             </div>
           )}
-          <p className="library-note">
-            Eight playable originals. Fresh challenges. No downloads.{" "}
-            <span>Stay for one more round. ↗</span>
-          </p>
         </section>
         <aside
           className="grubhub-ad"
@@ -412,9 +434,6 @@ function ArcadeContent() {
           onNameChange={setGuestName}
           signedIn={!!cloud.user}
           onStart={(race) => {
-            setBallOpen(false);
-            setPlanetOpen(false);
-            setCloudOpen(false);
             if (race) {
               setPlaying(null);
               setOnlineRace(race);
@@ -427,10 +446,7 @@ function ArcadeContent() {
         <section id="leaderboards" className="leaderboards">
           <div className="section-heading">
             <div>
-              <span className="eyebrow">A LITTLE HEALTHY COMPETITION</span>
-              <h2>
-                Make your mark<span>.</span>
-              </h2>
+              <h2>Leaderboards</h2>
             </div>
             <span className="local-badge">
               <Trophy size={15} />{" "}
@@ -532,7 +548,7 @@ function ArcadeContent() {
                       </small>
                     </div>
                     <button onClick={() => setPlaying(boardGame)}>
-                      Let’s play <ArrowUpRight size={16} />
+                      Play {gameById(boardGame).title}
                     </button>
                   </div>
                 )}
@@ -560,7 +576,6 @@ function ArcadeContent() {
             <Heart size={27} />
           </span>
           <div className="support-banner-copy">
-            <span className="eyebrow">A LITTLE SUPPORT. A LOT OF PLAY.</span>
             <h2>Support wheelcoding OnlineArcade</h2>
             <p>Enjoying the games? Show your support.</p>
           </div>
@@ -584,65 +599,49 @@ function ArcadeContent() {
           </span>
         </footer>
       </main>
-      {cloudOpen && (
-        <Cloudbound
-          accountId={cloud.user?.id}
-          onClose={() => setCloudOpen(false)}
-        />
+      {playing === "cloudbound" && (
+        <Cloudbound accountId={cloud.user?.id} onClose={closeGame} />
       )}
-      {(ballOpen || onlineRace?.session.game === "boostball") && (
+      {(playing === "boostball" ||
+        onlineRace?.session.game === "boostball") && (
         <Boostball
+          key={onlineRace?.session.id ?? "solo-boostball"}
           link={
             onlineRace?.session.game === "boostball" ? onlineRace : undefined
           }
-          onClose={() => {
-            setBallOpen(false);
-            setOnlineRace(null);
-          }}
-          onFriends={() => {
-            setBallOpen(false);
-            window.dispatchEvent(new Event("oa:boostball"));
-            document
-              .getElementById("multiplayer")
-              ?.scrollIntoView({ behavior: "smooth" });
-          }}
+          onClose={closeGame}
+          onFriends={() => chooseParty("boostball")}
         />
       )}
-      {(planetOpen || onlineRace?.session.game === "party-planet") && (
+      {(playing === "party-planet" ||
+        onlineRace?.session.game === "party-planet") && (
         <PartyPlanet
+          key={onlineRace?.session.id ?? "solo-planet"}
           link={
             onlineRace?.session.game === "party-planet" ? onlineRace : undefined
           }
-          onClose={() => {
-            setPlanetOpen(false);
-            setOnlineRace(null);
-          }}
-          onFriends={() => {
-            setPlanetOpen(false);
-            window.dispatchEvent(new Event("oa:party-planet"));
-            document
-              .getElementById("multiplayer")
-              ?.scrollIntoView({ behavior: "smooth" });
-          }}
+          onClose={closeGame}
+          onFriends={() => chooseParty("party-planet")}
         />
       )}
-      {onlineRace && onlineRace.session.game === "kart-circuit" && (
-        <OnlineKart link={onlineRace} onClose={() => setOnlineRace(null)} />
-      )}
-      {playing === "neon-dash" && (
-        <NeonDash
-          onClose={() => setPlaying(null)}
-          onScore={(score) => saveScore("neon-dash", score)}
+      {onlineRace?.session.game === "kart-circuit" && (
+        <OnlineKart
+          key={onlineRace.session.id}
+          link={onlineRace}
+          onClose={closeGame}
         />
       )}
-      {playing && playing !== "neon-dash" && (
-        <GamePlayer
-          key={playing}
-          gameId={playing}
-          onClose={() => setPlaying(null)}
-          onScore={(score) => saveScore(playing, score)}
-        />
-      )}
+      {playing &&
+        playing !== "cloudbound" &&
+        playing !== "boostball" &&
+        playing !== "party-planet" && (
+          <GamePlayer
+            key={playing}
+            gameId={playing}
+            onClose={closeGame}
+            onScore={(score) => saveScore(playing, score)}
+          />
+        )}
       {profile && (
         <AccountDialog
           guestName={guestName}

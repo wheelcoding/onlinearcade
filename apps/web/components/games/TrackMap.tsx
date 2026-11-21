@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { sampleTrack, type TrackDefinition } from "@onlinearcade/core";
 const colors = {
   coast: "#ffd29b",
@@ -16,21 +17,28 @@ export default function TrackMap({
   small?: boolean;
   rivals?: { id: number; x: number; z: number; color: string }[];
 }) {
-  const samples = sampleTrack(track, 180),
-    xs = samples.map((p) => p.x),
-    zs = samples.map((p) => p.z),
-    minX = Math.min(...xs) - 22,
-    minZ = Math.min(...zs) - 22,
-    width = Math.max(...xs) - minX + 22,
-    height = Math.max(...zs) - minZ + 22;
-  const path =
-    samples
-      .map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)} ${p.z.toFixed(1)}`)
-      .join(" ") + "Z";
+  const { start, viewBox, path } = useMemo(() => {
+    const samples = sampleTrack(track, 180),
+      xs = samples.map((p) => p.x),
+      zs = samples.map((p) => p.z),
+      minX = Math.min(...xs) - 22,
+      minZ = Math.min(...zs) - 22,
+      width = Math.max(...xs) - minX + 22,
+      height = Math.max(...zs) - minZ + 22;
+    const path =
+      samples
+        .map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)} ${p.z.toFixed(1)}`)
+        .join(" ") + "Z";
+    return {
+      start: samples[0],
+      viewBox: [minX, minZ, width, height].join(" "),
+      path,
+    };
+  }, [track]);
   return (
     <svg
       className={small ? "track-map compact" : "track-map"}
-      viewBox={`${minX} ${minZ} ${width} ${height}`}
+      viewBox={viewBox}
       role="img"
       aria-label={`${track.name} course map${position ? ", live position" : ""}`}
     >
@@ -57,8 +65,8 @@ export default function TrackMap({
         opacity=".65"
       />
       <circle
-        cx={samples[0].x}
-        cy={samples[0].z}
+        cx={start.x}
+        cy={start.z}
         r="5"
         fill="#fff2d4"
         stroke="#24334a"
