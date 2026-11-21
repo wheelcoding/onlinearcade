@@ -4152,13 +4152,6 @@ button:active:not(:disabled) {
     font-size: 12px;
   }
 }
-/* Deluxe arcade: large touch-friendly puzzle board and clear assist controls. */
-.puzzle-canvas {
-  aspect-ratio: 1;
-  max-width: 640px;
-  margin: auto;
-  background: #112733;
-}
 .puzzle-stage {
   background: #10232e;
 }
@@ -4251,12 +4244,6 @@ button:active:not(:disabled) {
   .medal-targets b {
     font-size: 9px;
   }
-  .puzzle-canvas {
-    min-height: 0;
-  }
-}
-.advanced-dialog:fullscreen .puzzle-canvas {
-  width: min(100%, 72vh);
 }
 
 .party-race-options { display:grid; gap:12px; margin:18px 0; }
