@@ -1,4 +1,8 @@
-import { BoostballSimulation, type BallInput } from "@onlinearcade/core";
+import {
+  BoostballSimulation,
+  type BallInput,
+  type BoostballArenaId,
+} from "@onlinearcade/core";
 import type { RaceRoster } from "./protocol.js";
 export class OnlineBall {
   readonly sim: BoostballSimulation;
@@ -12,9 +16,12 @@ export class OnlineBall {
   constructor(
     readonly id: string,
     roster: RaceRoster[],
+    arena: BoostballArenaId = "classic",
   ) {
     this.sim = new BoostballSimulation(
       roster.map((p) => ({ id: p.memberId, name: p.name, color: p.color })),
+      false,
+      arena,
     );
   }
   command(id: string, raw: any, now = Date.now()) {

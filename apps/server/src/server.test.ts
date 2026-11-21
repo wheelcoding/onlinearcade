@@ -27,10 +27,11 @@ async function fixture(options: Parameters<typeof createArcadeServer>[1] = {}) {
   await new Promise<void>((r) => http.listen(0, "127.0.0.1", r));
   const url = `http://127.0.0.1:${(http.address() as { port: number }).port}`;
   const sockets: Socket[] = [];
-  const client = async () => {
+  const client = async (auth?: { boostballArena?: string }) => {
     const s = connect(url, {
       autoConnect: false,
       reconnection: false,
+      auth,
       extraHeaders: { Origin: "http://localhost:3000" },
     });
     sockets.push(s);
@@ -433,7 +434,7 @@ test("Party Planet launches one shared match, isolates room snapshots and accept
 test("Boostball launches one shared match, isolates room snapshots and accepts only owned controls", async () => {
   const f = await fixture();
   try {
-    const a = await f.client(),
+    const a = await f.client({ boostballArena: "expanded" }),
       b = await f.client(),
       other = await f.client();
     const { state: room } = await f.create(a, "Alex");
@@ -455,6 +456,7 @@ test("Boostball launches one shared match, isolates room snapshots and accepts o
     const received = event<any>(b, "ball:state");
     b.emit("ball:sync", started.id);
     const kickoff = await received;
+    assert.equal(kickoff.arena, "classic");
     assert.equal(kickoff.cars.length, 2);
     assert.deepEqual(kickoff.pads, [0, 0, 0, 0, 0, 0]);
     const packets: any[] = [];
@@ -488,6 +490,36 @@ test("Boostball launches one shared match, isolates room snapshots and accepts o
     const left = event<any>(a, "ball:state", (value) => !value.cars[1].active);
     b.emit("ball:exit", started.id);
     assert.equal((await left).cars[1].active, false);
+  } finally {
+    await f.close();
+  }
+});
+
+test("Boostball serves the expanded field when both guests support it", async () => {
+  const f = await fixture();
+  try {
+    const a = await f.client({ boostballArena: "expanded" });
+    const b = await f.client({ boostballArena: "expanded" });
+    const { state: room } = await f.create(a, "Alex");
+    assert.ok(
+      (await f.action(b, { action: "join", name: "Sam", code: room.code })).ok,
+    );
+    await f.action(a, { action: "ready", ready: true });
+    await f.action(b, { action: "ready", ready: true });
+    const session = event(a, "session");
+    assert.ok((await f.action(a, { action: "start", game: "boostball" })).ok);
+    const { id } = await session;
+    const host = event(a, "ball:state");
+    const guest = event(b, "ball:state");
+    a.emit("ball:sync", id);
+    b.emit("ball:sync", id);
+    for (const packet of await Promise.all([host, guest])) {
+      assert.equal(packet.sessionId, id);
+      assert.equal(packet.arena, "expanded");
+      assert.equal(packet.ball.x, 624);
+      assert.equal(packet.ball.y, 360);
+      assert.equal(packet.pads.length, 10);
+    }
   } finally {
     await f.close();
   }

@@ -1,6 +1,16 @@
 import * as T from "three";
 import { createBallSoftwareRenderer } from "./boostball-software";
-import { BOOSTBALL_PADS, type BallState } from "@onlinearcade/core";
+import {
+  paintBoostballPitch,
+  paintBoostballSkyline,
+  paintBoostballStands,
+} from "./boostball-textures";
+import {
+  BOOSTBALL_BALL_RADIUS,
+  BOOSTBALL_UNITS_PER_METER as UNITS,
+  type BallState,
+  type BoostballArena,
+} from "@onlinearcade/core";
 export type BallCamera = "chase" | "ball" | "stadium";
 export type BallView = {
   draw: (state: BallState, dt: number, mode: BallCamera) => void;
@@ -9,17 +19,24 @@ export type BallView = {
 };
 const BLUE = 0x39c5ff,
   ORANGE = 0xff934f;
-const END_WALL_X = 37.25;
-const SIDE_WALL_Z = 20;
-const scale = (x: number, y: number, height = 0) =>
-  new T.Vector3((x - 480) / 12, height / 12, (y - 270) / 12);
 /** Procedural original models and textures; no remote assets or per-frame geometry allocation. */
 export function createBoostballView(
   target: HTMLElement,
   mine: string,
+  arena: BoostballArena,
   indicator: HTMLElement | null,
   onLost: () => void,
 ): BallView {
+  const { centerX, centerY, field } = arena;
+  const endWallX = (field.right - centerX) / UNITS;
+  const sideWallZ = (field.bottom - centerY) / UNITS;
+  const pitchLength = endWallX * 2;
+  const pitchWidth = sideWallZ * 2;
+  const mouth = arena.goalHalfWidth / UNITS;
+  const crossbar = arena.goalHeight / UNITS;
+  const goalDepth = arena.netDepth / UNITS;
+  const scale = (x: number, y: number, height = 0) =>
+    new T.Vector3((x - centerX) / UNITS, height / UNITS, (y - centerY) / UNITS);
   let renderer: T.WebGLRenderer | ReturnType<typeof createBallSoftwareRenderer>;
   let software = false;
   try {
@@ -48,7 +65,7 @@ export function createBoostballView(
   const scene = new T.Scene();
   scene.background = new T.Color(0x191b35);
   scene.fog = new T.Fog(0x191b35, 88, 190);
-  const camera = new T.PerspectiveCamera(62, 1, 0.1, 240);
+  const camera = new T.PerspectiveCamera(62, 1, 0.1, 280);
   camera.position.set(-43, 15, 16);
   const look = new T.Vector3(0, 1, 0);
   let softwareFrame = 0;
@@ -115,72 +132,19 @@ export function createBoostballView(
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, {
-    left: -48,
-    right: 48,
-    top: 30,
-    bottom: -30,
+    left: -endWallX - 10,
+    right: endWallX + 10,
+    top: sideWallZ + 10,
+    bottom: -sideWallZ - 10,
     near: 1,
-    far: 100,
+    far: 140,
   });
   sun.shadow.normalBias = 0.03;
   scene.add(sun);
   const fill = new T.DirectionalLight(0x7cacff, 1.6);
   fill.position.set(30, 15, -30);
   scene.add(fill);
-  // Procedural turf: blades, mowing bands, center circle and regulation-inspired markings.
-  const turfCanvas = document.createElement("canvas");
-  turfCanvas.width = 2048;
-  turfCanvas.height = 1024;
-  const ctx = turfCanvas.getContext("2d")!;
-  ctx.fillStyle = "#244953";
-  ctx.fillRect(0, 0, 2048, 1024);
-  for (let i = 0; i < 16; i++) {
-    ctx.fillStyle = i % 2 ? "#2b5659" : "#264c52";
-    ctx.fillRect(i * 128, 0, 128, 1024);
-  }
-  let seed = 41;
-  for (let i = 0; i < 22000; i++) {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    const x = (seed >>> 13) % 2048;
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    const y = (seed >>> 13) % 1024;
-    ctx.fillStyle = i % 2 ? "#d0ffca12" : "#071c341b";
-    ctx.fillRect(x, y, 1, 3);
-  }
-  ctx.strokeStyle = "#c0e1da";
-  ctx.lineWidth = 4;
-  ctx.globalAlpha = 0.7;
-  ctx.strokeRect(14, 14, 2020, 996);
-  ctx.beginPath();
-  ctx.moveTo(1024, 14);
-  ctx.lineTo(1024, 1010);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(1024, 512, 184, 0, Math.PI * 2);
-  ctx.fillStyle = "#1b394d";
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "#d1ede2";
-  ctx.beginPath();
-  ctx.moveTo(1068, 410);
-  ctx.lineTo(949, 534);
-  ctx.lineTo(1014, 534);
-  ctx.lineTo(983, 623);
-  ctx.lineTo(1100, 490);
-  ctx.lineTo(1038, 490);
-  ctx.closePath();
-  ctx.fill();
-  for (const right of [false, true]) {
-    const x = right ? 1726 : 14;
-    ctx.fillStyle = right ? "#f8a3642e" : "#68d8f832";
-    ctx.fillRect(x, 282, 308, 460);
-    ctx.strokeRect(x, 282, 308, 460);
-    ctx.beginPath();
-    ctx.arc(right ? 1810 : 238, 512, 75, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
-  const turf = new T.CanvasTexture(turfCanvas);
+  const turf = new T.CanvasTexture(paintBoostballPitch(arena));
   turf.colorSpace = T.SRGBColorSpace;
   turf.anisotropy = Math.min(
     8,
@@ -191,175 +155,278 @@ export function createBoostballView(
   textures.add(turf);
   const turfMat = new T.MeshStandardMaterial({ map: turf, roughness: 0.95 });
   materials.add(turfMat);
-  const pitch = mesh(new T.PlaneGeometry(74.4, 39.4, 16, 8), turfMat, scene);
+  const pitch = mesh(
+    new T.PlaneGeometry(pitchLength, pitchWidth, 20, 12),
+    turfMat,
+    scene,
+  );
   pitch.rotation.x = -Math.PI / 2;
   pitch.renderOrder = -10;
-  box(86, 1, 52, dark, scene, 0, -0.65, 0).renderOrder = -20;
-  // Transparent boards preserve a clear chase camera and show all genuine collision boundaries.
+  pitch.castShadow = false;
+  box(
+    pitchLength + 28,
+    1,
+    pitchWidth + 26,
+    dark,
+    scene,
+    0,
+    -0.63,
+    0,
+  ).renderOrder = -20;
+
   const boardMat = new T.MeshStandardMaterial({
-    color: 0x89b9d0,
+    color: 0x92bedb,
     transparent: true,
-    opacity: 0.12,
-    roughness: 0.25,
+    opacity: 0.09,
+    roughness: 0.3,
     depthWrite: false,
   });
   materials.add(boardMat);
+  const shadowlessBox = (
+    w: number,
+    h: number,
+    d: number,
+    mat: T.Material,
+    x: number,
+    y: number,
+    z: number,
+  ) => {
+    const piece = box(w, h, d, mat, scene, x, y, z);
+    piece.castShadow = false;
+    return piece;
+  };
   for (const side of [-1, 1]) {
-    const z = side * SIDE_WALL_Z;
-    box(75, 14, 0.18, boardMat, scene, 0, 7, z);
-    box(75, 0.58, 0.24, dark, scene, 0, 0.28, z);
-    box(37.4, 0.1, 0.28, blue, scene, -18.7, 0.59, z);
-    box(37.4, 0.1, 0.28, orange, scene, 18.7, 0.59, z);
-    box(75, 0.1, 0.14, steel, scene, 0, 3.2, z);
-    for (let x = -36; x <= 36; x += 9)
-      box(0.13, 3.2, 0.16, steel, scene, x, 1.6, z);
+    const z = side * sideWallZ;
+    for (let bay = 0; bay < 8; bay++) {
+      const length = pitchLength / 8;
+      const x = -endWallX + (bay + 0.5) * length;
+      const team = x < 0 ? blue : orange;
+      shadowlessBox(length, 3.8, 0.16, boardMat, x, 2.3, z);
+      shadowlessBox(length, 0.64, 0.32, dark, x, 0.32, z);
+      shadowlessBox(length - 0.18, 0.12, 0.36, team, x, 0.67, z);
+      shadowlessBox(0.16, 3.9, 0.27, steel, x - length / 2, 2.3, z);
+    }
   }
-  for (const sign of [-1, 1]) {
-    const x = sign * END_WALL_X,
-      team = sign > 0 ? orange : blue;
-    for (const z of [-12.5, 12.5]) {
-      box(0.18, 14, 15, boardMat, scene, x, 7, z);
-      box(0.28, 0.65, 15, dark, scene, x, 0.32, z);
-      box(0.31, 0.15, 15, team, scene, x, 0.69, z);
+
+  const homeApron = standard(0x254d63, 0.72);
+  const awayApron = standard(0x66413c, 0.72);
+  for (const side of [-1, 1]) {
+    const x = side * endWallX;
+    const back = x + side * goalDepth;
+    const team = side > 0 ? orange : blue;
+    const wing = sideWallZ - mouth;
+    for (const z of [-1, 1]) {
+      const center = z * (mouth + wing / 2);
+      shadowlessBox(0.18, 5.6, wing, boardMat, x, 3.25, center);
+      shadowlessBox(0.32, 0.7, wing, dark, x, 0.35, center);
+      shadowlessBox(0.36, 0.15, wing, team, x, 0.76, center);
+      const post = z * (mouth + 0.19);
+      box(
+        0.43,
+        crossbar + 0.32,
+        0.38,
+        team,
+        scene,
+        x,
+        (crossbar + 0.32) / 2,
+        post,
+      );
+      shadowlessBox(
+        goalDepth,
+        0.18,
+        0.18,
+        steel,
+        (x + back) / 2,
+        crossbar,
+        post,
+      );
+      shadowlessBox(0.22, crossbar, 0.22, steel, back, crossbar / 2, post);
     }
-    box(0.18, 6.5, 10.5, boardMat, scene, x, 10.75, 0);
-    // Recessed net, glowing posts, crossbar and goal sensor apron.
-    for (const z of [-5.25, 5.25]) {
-      box(0.41, 7.5, 0.38, team, scene, x, 3.75, z);
-      box(3.4, 0.17, 0.22, steel, scene, x + sign * 1.6, 7.45, z);
-    }
-    box(0.28, 0.28, 10.75, team, scene, x, 7.5, 0);
-    box(0.2, 0.2, 10.75, steel, scene, x + sign * 3.4, 7.45, 0);
+    box(0.42, 0.36, mouth * 2 + 0.76, team, scene, x, crossbar + 0.18, 0);
+    shadowlessBox(0.22, 0.2, mouth * 2 + 0.64, steel, back, crossbar, 0);
+    shadowlessBox(
+      goalDepth,
+      0.06,
+      mouth * 2,
+      side > 0 ? awayApron : homeApron,
+      (x + back) / 2,
+      -0.015,
+      0,
+    );
+    shadowlessBox(0.18, 0.16, mouth * 2, team, back, 0.08, 0);
     const net = new T.LineBasicMaterial({
-      color: sign > 0 ? 0xe6b697 : 0x87c9e2,
+      color: side > 0 ? 0xf1c2a4 : 0x98d3eb,
       transparent: true,
-      opacity: 0.62,
+      opacity: 0.64,
     });
     materials.add(net);
     const vertices: number[] = [];
-    const back = x + sign * 3.4;
-    for (let y = 0.2; y <= 7.5; y += 0.48) {
-      vertices.push(back, y, -5.25, back, y, 5.25);
-      for (const z of [-5.25, 5.25]) vertices.push(x, y, z, back, y, z);
+    for (let y = 0.4; y < crossbar; y += 0.53) {
+      vertices.push(back, y, -mouth, back, y, mouth);
+      for (const z of [-mouth, mouth]) vertices.push(x, y, z, back, y, z);
     }
-    for (let z = -5.25; z <= 5.25; z += 0.48)
-      vertices.push(back, 0, z, back, 7.5, z, x, 7.5, z, back, 7.5, z);
+    for (let z = -mouth + 0.3; z < mouth; z += 0.53) {
+      vertices.push(
+        back,
+        0,
+        z,
+        back,
+        crossbar,
+        z,
+        x,
+        crossbar,
+        z,
+        back,
+        crossbar,
+        z,
+      );
+    }
     const geo = new T.BufferGeometry();
     geo.setAttribute("position", new T.Float32BufferAttribute(vertices, 3));
     geometries.add(geo);
     scene.add(new T.LineSegments(geo, net));
-    box(
-      3.4,
-      0.04,
-      10.5,
-      standard(sign > 0 ? 0x653d2d : 0x1f5168),
-      scene,
-      x + sign * 1.7,
-      0.02,
-      0,
-    );
-    const light = new T.PointLight(sign > 0 ? ORANGE : BLUE, 70, 25, 2);
-    light.position.set(x, 5, 0);
+    const light = new T.PointLight(side > 0 ? ORANGE : BLUE, 76, 27, 2);
+    light.position.set(x + side * 0.7, 5, 0);
     scene.add(light);
   }
-  // Tiered grandstands, steel roof ribs, light gantries and a distant city skyline.
-  const seats = standard(0x25354b, 0.8),
-    concrete = standard(0x303f51, 0.9);
+
+  // Seating sections are textured panels so the same stands appear in both renderers.
+  const texturedPanel = (canvas: HTMLCanvasElement) => {
+    const texture = new T.CanvasTexture(canvas);
+    texture.colorSpace = T.SRGBColorSpace;
+    textures.add(texture);
+    const material = new T.MeshBasicMaterial({ map: texture });
+    materials.add(material);
+    return material;
+  };
+  const standMat = texturedPanel(paintBoostballStands());
+  const skyMat = texturedPanel(paintBoostballSkyline());
+  const concrete = standard(0x334557, 0.78);
+  const skyWidth = pitchLength + 85;
+  const skyHeight = 43;
+  const standLength = pitchLength + 12;
+  const standSection = standLength / 5;
+  const frontRowZ = sideWallZ + 4.2;
+  const secondRowZ = sideWallZ + 11.4;
   for (const side of [-1, 1]) {
-    for (let tier = 0; tier < 5; tier++)
-      box(
-        88,
-        1.2,
-        2.8,
-        tier % 2 ? dark : concrete,
-        scene,
-        0,
-        1 + tier * 1.55,
-        side * (24 + tier * 2.7),
-      );
-    const crowdGeo = new T.BoxGeometry(0.45, 0.7, 0.5);
-    geometries.add(crowdGeo);
-    const crowd = new T.InstancedMesh(crowdGeo, seats, 450);
-    const matrix = new T.Matrix4(),
-      color = new T.Color();
-    for (let i = 0; i < 450; i++) {
-      const row = Math.floor(i / 90);
-      matrix.makeTranslation(
-        -43 + (i % 90) * 0.96,
-        2 + row * 1.55,
-        side * (24 + row * 2.7),
-      );
-      crowd.setMatrixAt(i, matrix);
-      crowd.setColorAt(
-        i,
-        color.setHex(
-          i % 7 === 0 ? 0xffad70 : i % 5 === 0 ? 0x63d6ed : 0x596c86,
-        ),
-      );
+    const band = side < 0 ? blue : orange;
+    const floodlight = glow(side < 0 ? 0xccecff : 0xffe1b2, 2.1);
+    for (const [row, setback] of [frontRowZ, secondRowZ].entries()) {
+      const deck = 1 + row * 4.9;
+      const z = side * setback;
+      for (let section = 0; section < 5; section++) {
+        const x = -standLength / 2 + (section + 0.5) * standSection;
+        shadowlessBox(
+          standSection,
+          1.3,
+          5.8,
+          concrete,
+          x,
+          deck - 0.45,
+          z + side * 2.3,
+        );
+        shadowlessBox(
+          standSection - 0.28,
+          0.19,
+          0.23,
+          band,
+          x,
+          deck + 0.34,
+          z - side * 0.17,
+        );
+        const seats = mesh(
+          new T.PlaneGeometry(standSection - 1.05, 4.5),
+          standMat,
+          scene,
+          x,
+          deck + 2.68,
+          z,
+        );
+        seats.rotation.y = side > 0 ? Math.PI : 0;
+        seats.rotation.x = 0.2;
+        seats.castShadow = false;
+      }
     }
-    crowd.instanceMatrix.needsUpdate = true;
-    scene.add(crowd);
-    for (let x = -42; x <= 42; x += 14) {
-      box(0.4, 17, 0.4, steel, scene, x, 8, side * 34);
-      const rib = box(0.25, 0.25, 18, steel, scene, x, 16, side * 28);
-      rib.rotation.x = side * 0.13;
-      box(5.4, 0.4, 1.25, dark, scene, x, 16.2, side * 21);
-      box(
-        5,
-        0.17,
-        1,
-        glow(side > 0 ? 0xffdfa3 : 0xc6e8ff, 2.1),
-        scene,
+    for (let bay = 0; bay <= 6; bay++) {
+      const x = -standLength / 2 + (standLength * bay) / 6;
+      const supportZ = side * (sideWallZ + 13.8);
+      shadowlessBox(0.54, 19, 0.68, steel, x, 9.5, supportZ);
+      const beam = shadowlessBox(
+        0.22,
+        0.39,
+        17,
+        steel,
         x,
-        15.95,
-        side * 21,
+        18,
+        side * (sideWallZ + 7.8),
+      );
+      beam.rotation.x = side * 0.14;
+      shadowlessBox(6.2, 0.35, 1.25, dark, x, 16.7, side * (sideWallZ + 0.65));
+      shadowlessBox(
+        5.75,
+        0.12,
+        1.1,
+        floodlight,
+        x,
+        16.43,
+        side * (sideWallZ + 0.65),
       );
     }
-    box(
-      88,
-      0.14,
-      0.2,
-      glow(side < 0 ? BLUE : ORANGE, 0.7),
-      scene,
+    shadowlessBox(
+      standLength,
+      0.16,
+      0.28,
+      band,
       0,
-      9,
-      side * 35,
+      12,
+      side * (sideWallZ + 10.5),
     );
-  }
-  for (let i = 0; i < 28; i++) {
-    const x = -95 + i * 7.1,
-      h = 7 + ((i * 13) % 17);
-    box(
-      4,
-      h,
-      5,
-      standard(i % 2 ? 0x18243b : 0x111b2f),
+
+    const skyline = mesh(
+      new T.PlaneGeometry(skyWidth, skyHeight),
+      skyMat,
       scene,
-      x,
-      h / 2,
-      -70 - (i % 3) * 5,
+      side * (endWallX + 33),
+      24,
+      0,
     );
-    for (let floor = 3; floor < h; floor += 3)
-      box(
-        3,
-        0.13,
-        0.05,
-        glow(i % 2 ? 0xf5b27c : 0x75a5e7, 0.5),
-        scene,
-        x,
-        floor,
-        -67.45 - (i % 3) * 5,
+    skyline.rotation.y = (side * -Math.PI) / 2;
+    skyline.castShadow = false;
+    skyline.renderOrder = -16;
+    const endStandX = side * (endWallX + goalDepth + 4);
+    const endSection = (pitchWidth + 16) / 3;
+    for (let section = -1; section <= 1; section++) {
+      const z = section * endSection;
+      shadowlessBox(
+        4.8,
+        2.4,
+        endSection,
+        concrete,
+        endStandX + side * 2.5,
+        1.2,
+        z,
       );
+      const seats = mesh(
+        new T.PlaneGeometry(endSection - 0.5, 4.2),
+        standMat,
+        scene,
+        endStandX,
+        4.7,
+        z,
+      );
+      seats.rotation.y = (side * -Math.PI) / 2;
+      seats.castShadow = false;
+      shadowlessBox(
+        0.25,
+        0.24,
+        endSection - 0.15,
+        band,
+        endStandX - side * 0.16,
+        7,
+        z,
+      );
+    }
   }
-  const moon = mesh(
-    new T.SphereGeometry(5, 24, 16),
-    glow(0xa7b4d3, 0.6),
-    scene,
-    -65,
-    53,
-    -95,
-  );
-  moon.castShadow = false;
   // Branded rink boards and paired live score displays above the goals.
   const signCanvas = document.createElement("canvas");
   signCanvas.width = 1024;
@@ -375,9 +442,9 @@ export function createBoostballView(
   sc.fillRect(0, 0, 1024, 4);
   sc.fillRect(0, 124, 1024, 4);
   sc.fillStyle = "#edebd7";
-  sc.font = "900 58px sans-serif";
+  sc.font = "900 54px sans-serif";
   sc.textAlign = "center";
-  sc.fillText("B O O S T B A L L", 512, 84);
+  sc.fillText("BOOSTBALL", 512, 84);
   const signTexture = new T.CanvasTexture(signCanvas);
   signTexture.colorSpace = T.SRGBColorSpace;
   textures.add(signTexture);
@@ -386,8 +453,15 @@ export function createBoostballView(
     side: T.DoubleSide,
   });
   materials.add(signMat);
-  for (const z of [-22, 22]) {
-    const sign = mesh(new T.PlaneGeometry(45, 3.6), signMat, scene, 0, 3.36, z);
+  for (const z of [-(sideWallZ + 2.2), sideWallZ + 2.2]) {
+    const sign = mesh(
+      new T.PlaneGeometry(pitchLength * 0.33, 2.8),
+      signMat,
+      scene,
+      0,
+      2,
+      z,
+    );
     sign.castShadow = false;
     if (z > 0) sign.rotation.y = Math.PI;
   }
@@ -422,20 +496,39 @@ export function createBoostballView(
   };
   for (const side of [-1, 1]) {
     const team = side > 0 ? orange : blue;
-    const x = side * 43;
-    box(0.66, 4.2, 16.7, dark, scene, x, 11.4, 0);
-    box(0.9, 0.13, 16.9, team, scene, x, 13.5, 0);
-    box(0.9, 0.13, 16.9, team, scene, x, 9.3, 0);
-    for (const z of [-12, 12]) {
-      box(0.5, 15, 0.7, steel, scene, x, 7.5, z);
-      box(0.22, 10, 0.44, team, scene, x - side * 0.45, 6.6, z);
+    const x = side * (endWallX + goalDepth + 1.8);
+    const y = crossbar + 4.25;
+    const width = mouth * 3.45;
+    const height = width / 4;
+    shadowlessBox(0.66, height + 0.36, width + 0.58, dark, x, y, 0);
+    for (const edge of [-1, 1]) {
+      shadowlessBox(
+        0.9,
+        0.16,
+        width + 0.82,
+        team,
+        x,
+        y + edge * (height / 2 + 0.2),
+        0,
+      );
+      const post = edge * (width / 2 + 1.25);
+      shadowlessBox(
+        0.55,
+        y + height / 2 + 1,
+        0.7,
+        steel,
+        x,
+        (y + height / 2 + 1) / 2,
+        post,
+      );
+      shadowlessBox(0.22, 9.8, 0.4, team, x - side * 0.4, 6.3, post);
     }
     const panel = mesh(
-      new T.PlaneGeometry(16, 4),
+      new T.PlaneGeometry(width, height),
       scoreMat,
       scene,
       x - side * 0.36,
-      11.4,
+      y,
       0,
     );
     panel.rotation.y = (side * -Math.PI) / 2;
@@ -446,7 +539,7 @@ export function createBoostballView(
   const padRing = new T.TorusGeometry(1.3, 0.075, 6, 24);
   const padCore = new T.OctahedronGeometry(0.4);
   const padBase = new T.CylinderGeometry(1.1, 1.23, 0.11, 12);
-  const pads = BOOSTBALL_PADS.map((point) => {
+  const pads = arena.pads.map((point) => {
     const p = scale(point.x, point.y);
     const base = mesh(padBase, dark, scene, p.x, 0.05, p.z);
     const ring = mesh(padRing, padReady, scene, p.x, 0.11, p.z);
@@ -457,7 +550,7 @@ export function createBoostballView(
   });
   const ballGroup = new T.Group();
   scene.add(ballGroup);
-  const ballGeo = new T.IcosahedronGeometry(1.416, 2),
+  const ballGeo = new T.IcosahedronGeometry(BOOSTBALL_BALL_RADIUS / UNITS, 2),
     ballMaterial = standard(0xffffff, 0.36, 0.18);
   const vertices = ballGeo.getAttribute("position");
   const panels = new T.IcosahedronGeometry(1, 0);
@@ -775,9 +868,9 @@ export function createBoostballView(
       time += dt;
       const blend = 1 - Math.exp(-dt * 18);
       ballTarget.set(
-        (state.ball.x - 480) / 12,
-        (state.ball.height ?? 17) / 12,
-        (state.ball.y - 270) / 12,
+        (state.ball.x - centerX) / UNITS,
+        (state.ball.height ?? BOOSTBALL_BALL_RADIUS) / UNITS,
+        (state.ball.y - centerY) / UNITS,
       );
       if (newKickoff) ballPose.copy(ballTarget);
       else ballPose.lerp(ballTarget, blend);
@@ -802,7 +895,11 @@ export function createBoostballView(
         model.ring.visible = c.active && c.id === mine;
         model.shadow.visible = c.active;
         if (!c.active) continue;
-        carTarget.set((c.x - 480) / 12, (c.height ?? 0) / 12, (c.y - 270) / 12);
+        carTarget.set(
+          (c.x - centerX) / UNITS,
+          (c.height ?? 0) / UNITS,
+          (c.y - centerY) / UNITS,
+        );
         if (newKickoff) model.pose.copy(carTarget);
         else model.pose.lerp(carTarget, blend);
         const turn = Math.atan2(
@@ -896,9 +993,9 @@ export function createBoostballView(
         shock.position.copy(
           state.lastGoal
             ? scale(state.lastGoal.x, state.lastGoal.y, state.lastGoal.height)
-            : effectAt.set(team ? -37 : 37, 3, 0),
+            : effectAt.set((team ? -1 : 1) * endWallX, 3, 0),
         );
-        shock.position.x = team ? -36.6 : 36.6;
+        shock.position.x = (team ? -1 : 1) * (endWallX - 0.65);
         shockMat.color.setHex(winning);
         emit(shock.position, winning, 120, 29);
       }
@@ -938,8 +1035,9 @@ export function createBoostballView(
         state.cars.find((c) => c.active);
       const model = player ? cars.get(player.id) : undefined;
       if (mode === "stadium" || !player || !model) {
-        if (camera.aspect < 1) desired.set(-59, 80, 0);
-        else desired.set(0, 58, 50);
+        if (camera.aspect < 1)
+          desired.set(-endWallX * 1.58, endWallX * 2.16, 0);
+        else desired.set(0, endWallX * 1.49, sideWallZ * 2.02);
         aim.set(0, 0, 0);
         camera.fov = camera.aspect < 1 ? 69 : 58;
       } else {
@@ -965,16 +1063,8 @@ export function createBoostballView(
           p.z - dz * distance,
         );
         // Keep the follow camera inside the walls for a clear view near goals.
-        desired.x = T.MathUtils.clamp(
-          desired.x,
-          1 - END_WALL_X,
-          END_WALL_X - 1,
-        );
-        desired.z = T.MathUtils.clamp(
-          desired.z,
-          1 - SIDE_WALL_Z,
-          SIDE_WALL_Z - 1,
-        );
+        desired.x = T.MathUtils.clamp(desired.x, 1 - endWallX, endWallX - 1);
+        desired.z = T.MathUtils.clamp(desired.z, 1 - sideWallZ, sideWallZ - 1);
         const followDistance = Math.hypot(desired.x - p.x, desired.z - p.z);
         const wall = Math.max(0, 1 - followDistance / distance);
         aim.lerp(p, wall * 0.72);

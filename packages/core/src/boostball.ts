@@ -1,3 +1,10 @@
+import {
+  BOOSTBALL_BALL_RADIUS as BALL_RADIUS,
+  getBoostballArena,
+  type BoostballArenaId,
+} from "./boostball-arena";
+export * from "./boostball-arena";
+
 export type BallInput = {
   throttle: number;
   steer: number;
@@ -42,20 +49,12 @@ export type BallState = {
     vz?: number;
   };
   goal: string;
+  arena?: BoostballArenaId;
   overtime?: boolean;
   pads?: number[];
   lastTouch?: BallImpact & { carId: string; speed: number };
   lastGoal?: BallImpact & { team: number; scorer?: string };
 };
-export const BOOSTBALL_PADS = [
-  { x: 180, y: 102 },
-  { x: 180, y: 438 },
-  { x: 480, y: 102 },
-  { x: 480, y: 438 },
-  { x: 780, y: 102 },
-  { x: 780, y: 438 },
-] as const;
-const BALL_RADIUS = 17;
 const CAR_MAX_SPEED = 550;
 export const BALL_IDLE: BallInput = {
   throttle: 0,
@@ -66,14 +65,19 @@ export const BALL_IDLE: BallInput = {
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 export class BoostballSimulation {
   state: BallState;
+  readonly arena;
   private accumulator = 0;
   private jumpHeld = new Set<string>();
   private dodgeHeld = new Set<string>();
   constructor(
     roster: { id: string; name: string }[],
     private readonly freePlay = false,
+    arenaId: BoostballArenaId = "expanded",
   ) {
+    this.arena = getBoostballArena(arenaId);
+    const { centerX, centerY, pads } = this.arena;
     this.state = {
+      arena: arenaId,
       tick: 0,
       time: 180,
       countdown: freePlay ? 0 : 3,
@@ -94,16 +98,24 @@ export class BoostballSimulation {
         vz: 0,
         goals: 0,
       })),
-      ball: { x: 480, y: 270, vx: 0, vy: 0, height: BALL_RADIUS, vz: 0 },
+      ball: {
+        x: centerX,
+        y: centerY,
+        vx: 0,
+        vy: 0,
+        height: BALL_RADIUS,
+        vz: 0,
+      },
       goal: "Kickoff",
-      pads: BOOSTBALL_PADS.map(() => 0),
+      pads: pads.map(() => 0),
     };
     this.reset();
   }
   private reset() {
+    const { centerX, centerY, kickoffOffset, gridSpacing } = this.arena;
     this.state.ball = {
-      x: 480,
-      y: 270,
+      x: centerX,
+      y: centerY,
       vx: 0,
       vy: 0,
       height: BALL_RADIUS,
@@ -114,12 +126,12 @@ export class BoostballSimulation {
     this.jumpHeld.clear();
     this.dodgeHeld.clear();
     this.state.cars.forEach((c, i) => {
-      c.x = c.team ? 740 : 220;
+      c.x = centerX + (c.team ? kickoffOffset : -kickoffOffset);
       c.y =
-        270 +
+        centerY +
         (Math.floor(i / 2) -
           (this.state.cars.filter((p) => p.team === c.team).length - 1) / 2) *
-          75;
+          gridSpacing;
       c.vx = c.vy = c.vz = c.height = 0;
       c.angle = c.team ? Math.PI : 0;
       c.fuel = 100;
@@ -149,6 +161,17 @@ export class BoostballSimulation {
   }
   private step(dt: number, inputs: ReadonlyMap<string, BallInput>) {
     const s = this.state;
+    const {
+      length,
+      centerX,
+      centerY,
+      carBounds,
+      ballBounds,
+      goalHalfWidth,
+      goalHeight,
+      scoreInset,
+      pads: padLocations,
+    } = this.arena;
     if (s.complete) return;
     s.tick++;
     if (s.countdown > 0) {
@@ -169,7 +192,7 @@ export class BoostballSimulation {
       }
     }
     const cars = s.cars.filter((c) => c.active);
-    const pads = (s.pads ??= BOOSTBALL_PADS.map(() => 0));
+    const pads = (s.pads ??= padLocations.map(() => 0));
     for (let i = 0; i < pads.length; i++) pads[i] = Math.max(0, pads[i] - dt);
     for (const c of cars) {
       const u = inputs.get(c.id) ?? BALL_IDLE;
@@ -234,16 +257,16 @@ export class BoostballSimulation {
       }
       c.x += c.vx * dt;
       c.y += c.vy * dt;
-      if (c.x < 48 || c.x > 912) {
-        c.x = clamp(c.x, 48, 912);
+      if (c.x < carBounds.left || c.x > carBounds.right) {
+        c.x = clamp(c.x, carBounds.left, carBounds.right);
         c.vx *= -0.55;
       }
-      if (c.y < 48 || c.y > 492) {
-        c.y = clamp(c.y, 48, 492);
+      if (c.y < carBounds.top || c.y > carBounds.bottom) {
+        c.y = clamp(c.y, carBounds.top, carBounds.bottom);
         c.vy *= -0.55;
       }
       if (!airborne && c.fuel < 99.5) {
-        for (const [i, pad] of BOOSTBALL_PADS.entries()) {
+        for (const [i, pad] of padLocations.entries()) {
           if (pads[i] === 0 && Math.hypot(c.x - pad.x, c.y - pad.y) < 23) {
             c.fuel = Math.min(100, c.fuel + 35);
             pads[i] = 5;
@@ -263,10 +286,10 @@ export class BoostballSimulation {
           const nx = d ? dx / d : 1,
             ny = d ? dy / d : 0,
             overlap = (36 - d) / 2;
-          a.x = clamp(a.x - nx * overlap, 48, 912);
-          a.y = clamp(a.y - ny * overlap, 48, 492);
-          b.x = clamp(b.x + nx * overlap, 48, 912);
-          b.y = clamp(b.y + ny * overlap, 48, 492);
+          a.x = clamp(a.x - nx * overlap, carBounds.left, carBounds.right);
+          a.y = clamp(a.y - ny * overlap, carBounds.top, carBounds.bottom);
+          b.x = clamp(b.x + nx * overlap, carBounds.left, carBounds.right);
+          b.y = clamp(b.y + ny * overlap, carBounds.top, carBounds.bottom);
           const v = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
           if (v < 0) {
             a.vx += v * nx * 0.8;
@@ -338,9 +361,10 @@ export class BoostballSimulation {
     }
     // The whole ball must clear the posts, crossbar and line.
     const clearMouth =
-      Math.abs(b.y - 270) <= 63 - BALL_RADIUS && b.height + BALL_RADIUS < 90;
-    if (clearMouth && (b.x < 16 || b.x > 944)) {
-      const team = b.x > 480 ? 0 : 1;
+      Math.abs(b.y - centerY) <= goalHalfWidth - BALL_RADIUS &&
+      b.height + BALL_RADIUS < goalHeight;
+    if (clearMouth && (b.x < scoreInset || b.x > length - scoreInset)) {
+      const team = b.x > centerX ? 0 : 1;
       const scorer = s.cars.find(
         (car) => car.id === s.lastTouch?.carId && car.team === team,
       );
@@ -362,13 +386,13 @@ export class BoostballSimulation {
       }
       return;
     }
-    if (!clearMouth && (b.x < 46 || b.x > 914)) {
-      b.vx = (b.x < 46 ? 1 : -1) * Math.abs(b.vx) * 0.86;
-      b.x = clamp(b.x, 46, 914);
+    if (!clearMouth && (b.x < ballBounds.left || b.x > ballBounds.right)) {
+      b.vx = (b.x < ballBounds.left ? 1 : -1) * Math.abs(b.vx) * 0.86;
+      b.x = clamp(b.x, ballBounds.left, ballBounds.right);
     }
-    if (b.y < 46 || b.y > 494) {
-      b.vy = (b.y < 46 ? 1 : -1) * Math.abs(b.vy) * 0.86;
-      b.y = clamp(b.y, 46, 494);
+    if (b.y < ballBounds.top || b.y > ballBounds.bottom) {
+      b.vy = (b.y < ballBounds.top ? 1 : -1) * Math.abs(b.vy) * 0.86;
+      b.y = clamp(b.y, ballBounds.top, ballBounds.bottom);
     }
   }
 }
@@ -377,12 +401,23 @@ export class BoostballSimulation {
 export function boostballBot(state: BallState, id: string): BallInput {
   const bot = state.cars.find((c) => c.id === id);
   if (!bot || !bot.active) return BALL_IDLE;
+  const { length, centerY, ballBounds, goalHalfWidth } = getBoostballArena(
+    state.arena,
+  );
   const b = state.ball,
-    goalX = bot.team ? 0 : 960;
+    goalX = bot.team ? 0 : length;
   const separation = Math.hypot(b.x - bot.x, b.y - bot.y);
   const interceptTime = Math.min(0.38, separation / 580);
-  const ballX = clamp(b.x + b.vx * interceptTime, 46, 914);
-  const ballY = clamp(b.y + b.vy * interceptTime, 46, 494);
+  const ballX = clamp(
+    b.x + b.vx * interceptTime,
+    ballBounds.left,
+    ballBounds.right,
+  );
+  const ballY = clamp(
+    b.y + b.vy * interceptTime,
+    ballBounds.top,
+    ballBounds.bottom,
+  );
   const blocker = state.cars.find(
     (c) =>
       c.active &&
@@ -390,15 +425,22 @@ export function boostballBot(state: BallState, id: string): BallInput {
       (c.x - b.x) * (goalX - b.x) > 0 &&
       Math.abs(c.y - b.y) < 45,
   );
-  const goalY = blocker ? (blocker.y >= 270 ? 230 : 310) : 270;
+  const shootingLane = (goalHalfWidth - BALL_RADIUS) * 0.86;
+  const goalY =
+    centerY +
+    (blocker ? (blocker.y >= centerY ? -shootingLane : shootingLane) : 0);
   const distance = Math.hypot(goalX - ballX, goalY - ballY) || 1;
   const nx = (goalX - ballX) / distance,
     ny = (goalY - ballY) / distance;
   const dx = ballX - bot.x,
     dy = ballY - bot.y;
   const attacking = dx * nx + dy * ny > 18 && Math.abs(dx * ny - dy * nx) < 16;
-  const tx = attacking ? ballX + nx * 65 : clamp(ballX - nx * 74, 63, 897);
-  const ty = attacking ? ballY + ny * 65 : clamp(ballY - ny * 74, 63, 477);
+  const tx = attacking
+    ? ballX + nx * 65
+    : clamp(ballX - nx * 74, ballBounds.left + 17, ballBounds.right - 17);
+  const ty = attacking
+    ? ballY + ny * 65
+    : clamp(ballY - ny * 74, ballBounds.top + 17, ballBounds.bottom - 17);
   let angle = Math.atan2(ty - bot.y, tx - bot.x) - bot.angle;
   angle = Math.atan2(Math.sin(angle), Math.cos(angle));
   const turn = Math.abs(angle);

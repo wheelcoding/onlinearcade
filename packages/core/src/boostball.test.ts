@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   BoostballSimulation,
   BALL_IDLE,
-  BOOSTBALL_PADS,
+  getBoostballArena,
   boostballBot,
   type BallInput,
 } from "./boostball";
@@ -11,6 +11,8 @@ const roster = [
   { id: "a", name: "Alex" },
   { id: "b", name: "Sam" },
 ];
+const expanded = getBoostballArena("expanded");
+const { length, centerX, centerY, goalHalfWidth } = expanded;
 const drive: BallInput = { throttle: 1, steer: 0, boost: false, dodge: false };
 const run = (
   s: BoostballSimulation,
@@ -22,21 +24,21 @@ const run = (
 test("boostball countdown, team assignment, goals, kickoff reset and full time are authoritative", () => {
   const s = new BoostballSimulation(roster);
   run(s, 1, new Map([["a", drive]]));
-  assert.equal(s.state.cars[0].x, 220);
+  assert.equal(s.state.cars[0].x, centerX - expanded.kickoffOffset);
   assert.equal(s.state.time, 180);
   assert.deepEqual(
     s.state.cars.map((c) => c.team),
     [0, 1],
   );
   s.state.countdown = 0;
-  s.state.ball = { x: 900, y: 270, vx: 400, vy: 0 };
+  s.state.ball = { x: length - 60, y: centerY, vx: 400, vy: 0 };
   run(s, 0.2);
   assert.deepEqual(s.state.score, [1, 0]);
-  assert.equal(s.state.ball.x, 480);
+  assert.equal(s.state.ball.x, centerX);
   assert.ok(s.state.countdown > 0);
   assert.equal(s.state.cars[0].fuel, 100);
   s.state.countdown = 0;
-  s.state.ball = { x: 60, y: 270, vx: -400, vy: 0 };
+  s.state.ball = { x: 60, y: centerY, vx: -400, vy: 0 };
   run(s, 0.2);
   assert.deepEqual(s.state.score, [1, 1]);
   s.state.countdown = 0;
@@ -49,6 +51,31 @@ test("boostball countdown, team assignment, goals, kickoff reset and full time a
   assert.equal(s.state.tick, tick);
 });
 
+test("expanded Boostball has more playable field and an original-map fallback", () => {
+  const s = new BoostballSimulation(roster);
+  const classic = getBoostballArena();
+  assert.equal(s.state.arena, "expanded");
+  assert.ok(
+    expanded.carBounds.right - expanded.carBounds.left >
+      (classic.carBounds.right - classic.carBounds.left) * 1.3,
+  );
+  assert.ok(
+    expanded.carBounds.bottom - expanded.carBounds.top >
+      (classic.carBounds.bottom - classic.carBounds.top) * 1.3,
+  );
+  assert.equal(s.state.pads?.length, 10);
+  s.state.countdown = 0;
+  const car = s.state.cars[0];
+  Object.assign(car, { x: 1020, y: 590, vx: 180 });
+  run(s, 0.35, new Map([["a", drive]]));
+  assert.ok(car.x > 1020);
+  assert.equal(car.y, 590);
+  const vintage = new BoostballSimulation(roster, false, "classic");
+  assert.equal(vintage.state.cars[0].x, 220);
+  assert.equal(vintage.state.ball.x, 480);
+  assert.equal(vintage.state.pads?.length, 6);
+});
+
 test("a tie restarts at midfield in sudden death and the next goal wins", () => {
   const s = new BoostballSimulation(roster);
   s.state.countdown = 0;
@@ -56,13 +83,13 @@ test("a tie restarts at midfield in sudden death and the next goal wins", () => 
   run(s, 0.02);
   assert.equal(s.state.overtime, true);
   assert.equal(s.state.complete, false);
-  assert.equal(s.state.ball.x, 480);
+  assert.equal(s.state.ball.x, centerX);
   assert.ok(s.state.countdown > 2);
   run(s, 3.1);
   assert.ok(s.state.time > 0);
   const blue = s.state.cars[0];
-  Object.assign(blue, { x: 850, y: 270, vx: 500 });
-  s.state.ball = { x: 888, y: 270, vx: 0, vy: 0 };
+  Object.assign(blue, { x: length - 110, y: centerY, vx: 500 });
+  s.state.ball = { x: length - 72, y: centerY, vx: 0, vy: 0 };
   run(s, 0.2, new Map([["a", drive]]));
   assert.ok(s.state.complete);
   assert.deepEqual(s.state.score, [1, 0]);
@@ -74,13 +101,13 @@ test("free play starts immediately, keeps running, and resets for another shot",
   const s = new BoostballSimulation(roster.slice(0, 1), true);
   assert.equal(s.state.countdown, 0);
   s.state.time = 0.01;
-  s.state.ball = { x: 900, y: 270, vx: 400, vy: 0 };
+  s.state.ball = { x: length - 60, y: centerY, vx: 400, vy: 0 };
   run(s, 0.2);
   assert.equal(s.state.time, 0.01);
   assert.equal(s.state.complete, false);
   assert.equal(s.state.overtime, undefined);
   assert.deepEqual(s.state.score, [1, 0]);
-  assert.equal(s.state.ball.x, 480);
+  assert.equal(s.state.ball.x, centerX);
   assert.ok(s.state.countdown < 1.2);
 });
 
@@ -88,17 +115,17 @@ test("boost pads recharge, grant fuel once, and require a grounded car", () => {
   const s = new BoostballSimulation(roster);
   s.state.countdown = 0;
   const car = s.state.cars[0];
-  Object.assign(car, BOOSTBALL_PADS[0], { fuel: 20, height: 50 });
+  Object.assign(car, expanded.pads.at(-1), { fuel: 20, height: 50 });
   run(s, 0.1);
-  assert.equal(s.state.pads?.[0], 0);
+  assert.equal(s.state.pads?.at(-1), 0);
   assert.ok(car.fuel < 24);
   car.height = car.vz = 0;
   run(s, 1 / 120);
-  assert.equal(s.state.pads?.[0], 5);
+  assert.equal(s.state.pads?.at(-1), 5);
   assert.ok(car.fuel > 55);
   run(s, 0.5);
   assert.ok(car.fuel < 65);
-  assert.ok(s.state.pads![0] < 5);
+  assert.ok(s.state.pads!.at(-1)! < 5);
   car.fuel = 0;
   run(s, 4.6);
   assert.ok(car.fuel > 85);
@@ -131,7 +158,12 @@ test("powersliding turns more sharply and a held dodge gives only one directiona
 test("a shot clipping the outside of a post bounces instead of scoring", () => {
   const s = new BoostballSimulation(roster);
   s.state.countdown = 0;
-  s.state.ball = { x: 900, y: 323, vx: 420, vy: 0 };
+  s.state.ball = {
+    x: length - 60,
+    y: centerY + goalHalfWidth - 9,
+    vx: 420,
+    vy: 0,
+  };
   run(s, 0.2);
   assert.equal(s.state.score[0], 0);
   assert.ok(s.state.ball.vx < 0);
@@ -139,19 +171,19 @@ test("a shot clipping the outside of a post bounces instead of scoring", () => {
 test("walls outside goal mouths bounce; car contact transfers momentum to ball", () => {
   const s = new BoostballSimulation(roster);
   s.state.countdown = 0;
-  s.state.ball = { x: 900, y: 120, vx: 400, vy: 0 };
+  s.state.ball = { x: length - 60, y: 120, vx: 400, vy: 0 };
   run(s, 0.2);
   assert.equal(s.state.score[0], 0);
   assert.ok(s.state.ball.vx < 0);
   const c = s.state.cars[0];
-  c.x = 430;
-  c.y = 270;
+  c.x = centerX - 50;
+  c.y = centerY;
   c.vx = 250;
   c.angle = 0;
-  s.state.ball = { x: 470, y: 270, vx: 0, vy: 0 };
+  s.state.ball = { x: centerX - 10, y: centerY, vx: 0, vy: 0 };
   run(s, 0.2, new Map([["a", drive]]));
   assert.ok(s.state.ball.vx > 200);
-  assert.ok(s.state.ball.x > 480);
+  assert.ok(s.state.ball.x > centerX);
 });
 test("steering follows heading, boost consumes fuel and recharges released; dodge has a cooldown", () => {
   const s = new BoostballSimulation(roster);
@@ -163,7 +195,7 @@ test("steering follows heading, boost consumes fuel and recharges released; dodg
     new Map([["a", { ...drive, steer: 1, boost: true, dodge: true }]]),
   );
   assert.ok(c.angle > 0);
-  assert.ok(c.y > 270);
+  assert.ok(c.y > centerY);
   assert.ok(c.fuel < 100);
   assert.ok(c.cooldown > 1);
   const fuel = c.fuel;
@@ -250,11 +282,25 @@ test("airborne balls bounce off the floor and a shot above the crossbar cannot s
   run(s, 0.6);
   assert.ok(s.state.ball.height! >= 17);
   assert.ok(s.state.ball.vz! > 0);
-  s.state.ball = { x: 900, y: 270, vx: 400, vy: 0, height: 110, vz: 0 };
+  s.state.ball = {
+    x: length - 60,
+    y: centerY,
+    vx: 400,
+    vy: 0,
+    height: 110,
+    vz: 0,
+  };
   run(s, 0.12);
   assert.deepEqual(s.state.score, [0, 0]);
   assert.ok(s.state.ball.vx < 0);
-  s.state.ball = { x: 900, y: 270, vx: 400, vy: 0, height: 30, vz: 0 };
+  s.state.ball = {
+    x: length - 60,
+    y: centerY,
+    vx: 400,
+    vy: 0,
+    height: 30,
+    vz: 0,
+  };
   run(s, 0.2);
   assert.deepEqual(s.state.score, [1, 0]);
   assert.equal(s.state.ball.height, 17);
@@ -274,8 +320,8 @@ test("airborne cars clear grounded opponents and share identical jump trajectori
   s.state.countdown = 0;
   const a = s.state.cars[0],
     b = s.state.cars[1];
-  a.x = b.x = 480;
-  a.y = b.y = 270;
+  a.x = b.x = centerX;
+  a.y = b.y = centerY;
   a.height = 70;
   a.vz = 0;
   s.state.ball.x = 800;

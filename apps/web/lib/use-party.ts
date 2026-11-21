@@ -103,6 +103,7 @@ export function useParty(onStart: (race?: OnlineRaceLink) => void) {
     }
     storageKey.current = "oa-party-session-v2:" + endpoint;
     const s = io(endpoint, {
+      auth: { boostballArena: "expanded" },
       autoConnect: false,
       timeout: 20000,
       reconnection: true,
