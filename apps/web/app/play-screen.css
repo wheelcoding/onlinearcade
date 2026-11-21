@@ -676,12 +676,20 @@
     font-size: 9px;
   }
   .play-ball .ball-scoreboard > strong {
-    padding: 5px 8px;
+    padding: 5px 6px;
     gap: 4px;
     font-size: 10px;
+    letter-spacing: 0.03em;
   }
   .play-ball .ball-scoreboard b {
     font-size: 18px;
+  }
+  .ball-clock {
+    min-width: 55px;
+    padding-inline: 5px;
+  }
+  .ball-clock strong {
+    font-size: 12px;
   }
   .play-touch button {
     padding: 5px 7px;
@@ -846,7 +854,8 @@
     gap: 6px;
   }
   .play-ball .ball-scoreboard {
-    max-width: calc(100% - 136px);
+    gap: 0;
+    max-width: calc(100% - 172px - 2 * var(--play-right));
   }
   .play-cloud .cloud-hud {
     max-width: calc(100% - 136px);
