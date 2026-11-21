@@ -7,6 +7,13 @@ import {
   type CloudInput,
   type CloudResult,
 } from "@onlinearcade/core";
+import { Pause, Play } from "lucide-react";
+import {
+  PlayOptions,
+  PlayScreen,
+  PlayTouchControls,
+  isGameInput,
+} from "./PlayScreen";
 import { createCloudView, type CloudView } from "./games/cloudbound-view";
 import { createArcadeAudio } from "../lib/arcade-audio";
 import { cloudRecordKey, parseCloudResult } from "../lib/cloudbound-records";
@@ -33,23 +40,17 @@ export default function Cloudbound({
 }) {
   const audio = useRef<ReturnType<typeof createArcadeAudio> | null>(null);
   const [muted, setMuted] = useState(false);
-  const [started, setStarted] = useState(false),
-    [attempt, setAttempt] = useState(0),
+  const [attempt, setAttempt] = useState(0),
     [hud, setHud] = useState<Hud | null>(null),
     [paused, setPaused] = useState(false),
-    [help, setHelp] = useState(false),
     [error, setError] = useState(""),
-    [renderer, setRenderer] = useState(""),
     [best, setBest] = useState<CloudResult | null>(null),
     [recordNotice, setRecordNotice] = useState("");
   const mount = useRef<HTMLDivElement>(null),
-    dialog = useRef<HTMLElement>(null),
     keys = useRef(new Set<string>()),
     touch = useRef(new Set<string>()),
     simRef = useRef<CloudSimulation | null>(null),
-    pauseRef = useRef(false),
-    close = useRef(onClose);
-  close.current = onClose;
+    pauseRef = useRef(false);
   const pause = (value: boolean) => {
     pauseRef.current = value;
     setPaused(value);
@@ -57,7 +58,13 @@ export default function Cloudbound({
     touch.current.clear();
     simRef.current?.clearInput();
   };
-  useEffect(() => () => audio.current?.dispose(), []);
+  useEffect(() => {
+    audio.current = createArcadeAudio();
+    return () => {
+      audio.current?.dispose();
+      audio.current = null;
+    };
+  }, []);
   useEffect(() => {
     try {
       setBest(
@@ -68,41 +75,7 @@ export default function Cloudbound({
     } catch {}
   }, [accountId]);
   useEffect(() => {
-    const before = document.activeElement as HTMLElement | null,
-      overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialog.current?.focus();
-    const key = (e: KeyboardEvent) => {
-      if (e.code === "Escape") close.current();
-      if (e.key === "Tab") {
-        const nodes = dialog.current?.querySelectorAll<HTMLElement>(
-          "button:not([disabled])",
-        );
-        if (!nodes?.length) return;
-        const first = nodes[0],
-          last = nodes[nodes.length - 1];
-        if (
-          e.shiftKey &&
-          (document.activeElement === first ||
-            document.activeElement === dialog.current)
-        ) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-    window.addEventListener("keydown", key);
-    return () => {
-      window.removeEventListener("keydown", key);
-      document.body.style.overflow = overflow;
-      before?.focus();
-    };
-  }, []);
-  useEffect(() => {
-    if (!started || !mount.current) return;
+    if (!mount.current) return;
     const sim = new CloudSimulation();
     simRef.current = sim;
     pauseRef.current = false;
@@ -112,7 +85,6 @@ export default function Cloudbound({
     let view: CloudView;
     try {
       view = createCloudView(mount.current, sim);
-      setRenderer(view.mode);
     } catch {
       setError(
         "The game renderer could not start. Close the game and try again.",
@@ -135,11 +107,7 @@ export default function Cloudbound({
       dash: held("ShiftLeft", "ShiftRight", "KeyX"),
     });
     const keydown = (e: KeyboardEvent) => {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLSelectElement
-      )
-        return;
+      if (!isGameInput(e)) return;
       if (
         ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(
           e.code,
@@ -240,293 +208,179 @@ export default function Cloudbound({
       window.removeEventListener("blur", blur);
       document.removeEventListener("visibilitychange", hidden);
     };
-  }, [started, attempt, accountId]);
+  }, [attempt, accountId]);
   const restart = () => {
-    setHelp(false);
     setRecordNotice("");
     pause(false);
-    setAttempt((n) => n + 1);
+    setAttempt((value) => value + 1);
   };
-  const button = (code: string, label: string, accessible = label) => (
-    <button
-      key={code}
-      aria-label={accessible}
-      onPointerDown={(e) => {
-        e.preventDefault();
-        if (paused) return;
-        e.currentTarget.setPointerCapture(e.pointerId);
-        audio.current?.unlock();
-        touch.current.add(code);
-        if (code === "Space") simRef.current?.queueJump();
-        if (code === "ShiftLeft") simRef.current?.queueDash();
-      }}
-      onPointerUp={() => touch.current.delete(code)}
-      onPointerCancel={() => touch.current.delete(code)}
-      onLostPointerCapture={() => touch.current.delete(code)}
-    >
-      {label}
-    </button>
-  );
+  const timeMs = ((hud?.time ?? 0) + (hud?.falls ?? 0) * 3) * 1000;
   return (
-    <div className="modal">
-      <section
-        className="game-dialog cloud-dialog"
-        ref={dialog}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Cloudbound"
-      >
-        <div className="cloud-header">
-          <div>
-            <span className="eyebrow">3D PARKOUR · SOLO ADVENTURE</span>
-            <h2>
-              Cloudbound<span>✦</span>
-            </h2>
-          </div>
+    <PlayScreen
+      name="Cloudbound"
+      onExit={onClose}
+      className="play-cloud"
+      tools={
+        <>
           <button
-            className="secondary"
-            aria-label="Close Cloudbound"
-            onClick={onClose}
+            className="play-icon"
+            disabled={!!error || hud?.finished}
+            aria-label={paused ? "Resume climb" : "Pause climb"}
+            onClick={() => pause(!paused)}
           >
-            ✕
+            {paused ? <Play size={18} /> : <Pause size={18} />}
           </button>
-        </div>
-        {!started ? (
-          <div className="cloud-welcome">
-            <div className="cloud-welcome-art" aria-hidden="true">
-              <span>☁</span>
-              <i>✦</i>
-              <b>↑</b>
-            </div>
-            <span className="eyebrow">THE SUMMIT IS CALLING</span>
-            <h3>
-              A little courage.
-              <br />A lot of sky.
-            </h3>
+          <PlayOptions>
             <p>
-              Leap across 31 floating islands through Dawn Gardens, Azure Ruins
-              and Starlight Summit. Find crystals, light checkpoints and reach
-              the summit portal.
+              <strong>Cloudbound</strong>
             </p>
-            <div className="cloud-features">
-              <span>Double jump</span>
-              <span>Air dash</span>
-              <span>Moving islands</span>
-              <span>Checkpoints</span>
-            </div>
-            <button
-              className="primary"
-              onClick={() => {
-                audio.current ??= createArcadeAudio();
-                audio.current.unlock();
-                setStarted(true);
-              }}
-            >
-              Begin the climb ↗
-            </button>
-            <p className="cloud-instructions">
-              WASD / arrows move · Space double jump · Shift / X dash · R
-              recover · P pause. Touch controls included. Camera follows
-              automatically; no mouse lock needed.
+            <p>
+              WASD or arrows to move. Tap Space twice for a double jump and
+              Shift to dash. Aim for the landing ring.
+            </p>
+            <p>
+              Gold islands save your checkpoint. Falling or pressing R sends you
+              back with a three-second penalty.
             </p>
             {best && (
               <p>
-                Best on this browser: <strong>{time(best.elapsedMs)}</strong> ·{" "}
-                {best.crystals}/31 crystals
+                Best climb {time(best.elapsedMs)} · {best.crystals}/31 crystals
               </p>
             )}
-          </div>
-        ) : (
-          <>
-            <div className="cloud-hud">
-              <span>
-                <small>REGION</small>
-                <strong>
-                  {
-                    CLOUD_CHAPTERS[
-                      Math.min(2, Math.floor((hud?.reached ?? 0) / 10))
-                    ]
-                  }
-                </strong>
-              </span>
-              <span>
-                <small>RUN TIME</small>
-                <strong>
-                  {time(((hud?.time ?? 0) + (hud?.falls ?? 0) * 3) * 1000)}
-                </strong>
-              </span>
-              <span>
-                <small>CRYSTALS</small>
-                <strong>✦ {hud?.crystals ?? 0} / 31</strong>
-              </span>
-              <span>
-                <small>RECOVERIES</small>
-                <strong>
-                  {hud?.falls ?? 0} <em>+3s each</em>
-                </strong>
-              </span>
-            </div>
-            <div className="cloud-stage">
-              <div
-                className="cloud-canvas"
-                ref={mount}
-                aria-label="Cloudbound floating island course"
-              />
-              {paused && !hud?.finished && (
-                <div className="cloud-overlay">
-                  <span className="eyebrow">TAKE A BREATHER</span>
-                  <h3>Paused above the clouds.</h3>
-                  <button className="primary" onClick={() => pause(false)}>
-                    Resume climb
-                  </button>
-                </div>
-              )}
-              {hud?.finished && (
-                <div className="cloud-overlay cloud-victory">
-                  <span className="eyebrow">SUMMIT REACHED</span>
-                  <h3>You’re Cloudbound.</h3>
-                  <p className="cloud-medal">
-                    {"★".repeat(hud.result?.medal ?? 1)}
-                  </p>
-                  <strong>{time(hud.result!.elapsedMs)}</strong>
-                  <p>
-                    {hud.crystals}/31 crystals · {hud.falls} recoveries
-                  </p>
-                  <button className="primary" onClick={restart}>
-                    Chase a faster climb ↗
-                  </button>
-                  <button className="secondary" onClick={onClose}>
-                    Back to arcade
-                  </button>
-                </div>
-              )}
-              {!paused && !hud?.finished && (
-                <div className="cloud-corner-cue">
-                  {(hud?.respawn ?? 0) > 0.2
-                    ? "Back at your checkpoint · keep climbing"
-                    : hud?.grounded
-                      ? "Space to jump · again in midair"
-                      : "Double jump to reach farther"}
-                </div>
-              )}
-            </div>
-            <div
-              className="cloud-progress"
-              aria-label={`Reached island ${(hud?.reached ?? 0) + 1} of 31`}
+            <button
+              disabled={hud?.finished || !!error}
+              onClick={() => simRef.current?.respawn()}
             >
-              {CLOUD_PLATFORMS.map((p) => (
-                <span
-                  key={p.id}
-                  className={`${p.id <= (hud?.reached ?? 0) ? "reached" : ""} ${p.id % 10 === 0 ? "checkpoint" : ""}`}
-                />
-              ))}
-            </div>
-            <div className="cloud-toolbar">
-              <button
-                className="secondary"
-                disabled={hud?.finished}
-                onClick={() => pause(!paused)}
-              >
-                {paused ? "Resume" : "Pause"}
-              </button>
-              <button
-                className="secondary"
-                disabled={hud?.finished}
-                onClick={() => {
-                  simRef.current?.respawn();
-                }}
-              >
-                Checkpoint ↺ <small>+3s</small>
-              </button>
-              <button className="secondary" onClick={restart}>
-                Restart
-              </button>
-              <button
-                className="secondary"
-                onClick={() => {
-                  setHelp(!help);
-                  if (!help) pause(true);
-                }}
-              >
-                How to play
-              </button>
-              <button
-                className="secondary"
-                onClick={() => {
-                  audio.current?.unlock();
-                  audio.current?.setMuted(!muted);
-                  setMuted(!muted);
-                }}
-              >
-                {muted ? "Sound off" : "Sound on"}
-              </button>
-              <span className="cloud-dash-meter">
-                DASH{" "}
-                <i
-                  style={{
-                    width: `${Math.max(0, 1 - (hud?.dash ?? 0) / 1.25) * 100}%`,
-                  }}
-                />
-              </span>
-            </div>
-            <div className="cloud-touch">
-              <div>
-                {button("KeyA", "←", "Move left")}
-                {button("KeyW", "↑", "Move forward")}
-                {button("KeyS", "↓", "Move backward")}
-                {button("KeyD", "→", "Move right")}
-              </div>
-              <div>
-                {button("Space", "JUMP ↑", "Jump")}
-                {button("ShiftLeft", "DASH ✦", "Air dash")}
-              </div>
-            </div>
-            {help && (
-              <div className="cloud-help">
-                <strong>The climb</strong>
-                <p>
-                  Use WASD or arrows. W moves away from the camera. Tap Space
-                  twice for a double jump; hold a direction and tap Shift/X to
-                  dash. Use the landing ring to judge your jump.
-                </p>
-                <p>
-                  Gold islands save your checkpoint. Coral cracked islands
-                  crumble after 1.3 seconds and return after 3 seconds. Moving
-                  islands carry you. Falling returns you to your checkpoint with
-                  a three-second penalty; collected crystals stay collected.
-                  Reach the last island’s portal to finish.
-                </p>
-                <p>
-                  Gold medal: under 1:40 with no recoveries. Silver: under 2:40.
-                  Bronze: finish the climb. Best times are saved on this
-                  browser, separately from cloud leaderboards.
-                </p>
-                <button
-                  className="secondary"
-                  onClick={() => {
-                    setHelp(false);
-                    pause(false);
-                  }}
-                >
-                  Got it · resume
-                </button>
-              </div>
-            )}
-            {error && <p role="alert">{error}</p>}
-            <p className="muted" role="status">
-              {renderer === "2d"
-                ? "2D compatibility renderer · identical 3D movement and checkpoints"
-                : "Three.js · original floating worlds"}{" "}
-              ·{" "}
-              {best
-                ? `Browser best ${time(best.elapsedMs)}`
-                : "Finish the climb to set your first browser best."}
-              {recordNotice && ` · ${recordNotice}`}
+              Return to checkpoint (+3s)
+            </button>
+            <button onClick={restart}>Restart climb</button>
+            <button
+              aria-pressed={muted}
+              onClick={() => {
+                audio.current?.unlock();
+                audio.current?.setMuted(!muted);
+                setMuted(!muted);
+              }}
+            >
+              {muted ? "Turn sound on" : "Mute sound"}
+            </button>
+          </PlayOptions>
+        </>
+      }
+    >
+      <div tabIndex={-1} className="play-field">
+        <div
+          className="cloud-canvas"
+          ref={mount}
+          aria-label="Cloudbound floating island course"
+        />
+      </div>
+      <div className="cloud-hud play-hud">
+        <span className="hud-extra">
+          <small>Region</small>
+          <strong>
+            {CLOUD_CHAPTERS[Math.min(2, Math.floor((hud?.reached ?? 0) / 10))]}
+          </strong>
+        </span>
+        <span>
+          <small>Time</small>
+          <strong>{time(timeMs)}</strong>
+        </span>
+        <span>
+          <small>Crystals</small>
+          <strong>✦ {hud?.crystals ?? 0}/31</strong>
+        </span>
+      </div>
+      <div
+        className="cloud-progress"
+        aria-label={`Island ${(hud?.reached ?? 0) + 1} of 31`}
+      >
+        {CLOUD_PLATFORMS.map((platform) => (
+          <span
+            key={platform.id}
+            className={`${platform.id <= (hud?.reached ?? 0) ? "reached" : ""} ${platform.id % 10 === 0 ? "checkpoint" : ""}`}
+          />
+        ))}
+      </div>
+      {!paused && !hud?.finished && (
+        <>
+          {(hud?.respawn ?? 0) > 0.2 && (
+            <p className="play-message" role="status">
+              Checkpoint restored · +3 seconds
             </p>
-          </>
-        )}
-      </section>
-    </div>
+          )}
+          <div className="play-corner">
+            <span>Dash</span>
+            <progress
+              className="play-meter"
+              max={1.25}
+              value={Math.max(0, 1.25 - (hud?.dash ?? 0))}
+              aria-label="Air dash charge"
+            />
+            <strong>{hud?.dash ? `${hud.dash.toFixed(1)}s` : "Ready"}</strong>
+            <span>{hud?.falls ?? 0} falls</span>
+          </div>
+          <PlayTouchControls
+            left={[
+              ["KeyA", "←", "Move left"],
+              ["KeyW", "↑", "Move forward"],
+              ["KeyS", "↓", "Move backward"],
+              ["KeyD", "→", "Move right"],
+            ]}
+            right={[
+              ["ShiftLeft", "Dash", "Air dash"],
+              ["Space", "Jump"],
+            ]}
+            disabled={!!error}
+            onKey={(key, down) => {
+              if (!down) {
+                touch.current.delete(key);
+                return;
+              }
+              audio.current?.unlock();
+              touch.current.add(key);
+              if (key === "Space") simRef.current?.queueJump();
+              if (key === "ShiftLeft") simRef.current?.queueDash();
+            }}
+          />
+        </>
+      )}
+      {(paused || hud?.finished || error) && (
+        <div className="play-center" role={error ? "alert" : undefined}>
+          <h2>
+            {error
+              ? "Cloudbound could not start"
+              : hud?.finished
+                ? "Summit reached"
+                : "Paused"}
+          </h2>
+          {error && <p>{error}</p>}
+          {hud?.result && (
+            <>
+              <strong className="play-result">
+                {time(hud.result.elapsedMs)}
+              </strong>
+              <p>
+                {"★".repeat(hud.result.medal)} · {hud.crystals}/31 crystals ·{" "}
+                {hud.falls} recoveries
+              </p>
+              {recordNotice && <p role="status">{recordNotice}</p>}
+            </>
+          )}
+          <button
+            className="primary"
+            onClick={() =>
+              paused && !hud?.finished && !error ? pause(false) : restart()
+            }
+          >
+            {error
+              ? "Try again"
+              : hud?.finished
+                ? "Climb again"
+                : "Resume climb"}
+          </button>
+        </div>
+      )}
+    </PlayScreen>
   );
 }

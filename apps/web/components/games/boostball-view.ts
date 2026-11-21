@@ -15,6 +15,7 @@ const scale = (x: number, y: number, height = 0) =>
 export function createBoostballView(
   target: HTMLElement,
   mine: string,
+  indicator: HTMLElement | null,
   onLost: () => void,
 ): BallView {
   let renderer: T.WebGLRenderer | ReturnType<typeof createBallSoftwareRenderer>;
@@ -604,6 +605,7 @@ export function createBoostballView(
   const observer = new ResizeObserver(resize);
   observer.observe(target);
   resize();
+  const ballScreen = new T.Vector3();
   const ballPose = new T.Vector3(),
     desired = new T.Vector3(),
     aim = new T.Vector3();
@@ -716,9 +718,10 @@ export function createBoostballView(
         state.cars.find((c) => c.active);
       const model = player ? cars.get(player.id) : undefined;
       if (mode === "stadium" || !player || !model) {
-        desired.set(0, 58, 50);
+        if (camera.aspect < 1) desired.set(-59, 80, 0);
+        else desired.set(0, 58, 50);
         aim.set(0, 0, 0);
-        camera.fov = 58;
+        camera.fov = camera.aspect < 1 ? 69 : 58;
       } else {
         const p = model.pose;
         let dx = Math.cos(model.angle),
@@ -741,7 +744,8 @@ export function createBoostballView(
         );
         desired.x = Math.max(-48, Math.min(48, desired.x));
         desired.z = Math.max(-28, Math.min(28, desired.z));
-        camera.fov = 62 + Math.min(10, speed / 50);
+        camera.fov =
+          62 + Math.min(10, speed / 50) + Math.max(0, 1.1 - camera.aspect) * 20;
       }
       if (firstFrame) {
         camera.position.copy(desired);
@@ -752,6 +756,31 @@ export function createBoostballView(
       }
       camera.lookAt(look);
       camera.updateProjectionMatrix();
+      camera.updateMatrixWorld();
+      if (indicator) {
+        ballScreen.copy(ballPose).project(camera);
+        const behind = ballScreen.z > 1;
+        const visible =
+          !behind &&
+          ballScreen.z >= -1 &&
+          Math.abs(ballScreen.x) < 0.88 &&
+          Math.abs(ballScreen.y) < 0.87;
+        indicator.hidden =
+          visible ||
+          mode === "stadium" ||
+          state.complete ||
+          state.countdown > 0;
+        if (!indicator.hidden) {
+          const x = behind ? -ballScreen.x : ballScreen.x;
+          const y = behind ? -ballScreen.y : ballScreen.y;
+          indicator.style.left = `${Math.max(8, Math.min(92, 50 + x * 42))}%`;
+          indicator.style.top = `${Math.max(16, Math.min(80, 50 - y * 38))}%`;
+          indicator.style.setProperty(
+            "--ball-direction",
+            `${Math.atan2(-y, x)}rad`,
+          );
+        }
+      }
       softwareFrame += dt;
       if (!software || softwareFrame >= 1 / 24 || firstFrame) {
         renderer.render(scene, camera);

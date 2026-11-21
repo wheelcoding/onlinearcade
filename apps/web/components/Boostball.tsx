@@ -8,6 +8,15 @@ import {
 } from "@onlinearcade/core";
 import type { OnlineRaceLink } from "../lib/use-party";
 import type { BallCamera, BallView } from "./games/boostball-view";
+import { Pause, Play } from "lucide-react";
+import {
+  PlayOptions,
+  PlayScreen,
+  PlayTouchControls,
+  driveKeys,
+  isGameInput,
+} from "./PlayScreen";
+import { createArcadeAudio } from "../lib/arcade-audio";
 export default function Boostball({
   link,
   onClose,
@@ -17,64 +26,43 @@ export default function Boostball({
   onClose: () => void;
   onFriends: () => void;
 }) {
-  const [practice, setPractice] = useState(false),
-    [attempt, setAttempt] = useState(0),
+  const [attempt, setAttempt] = useState(0),
     [hud, setHud] = useState<BallState | null>(null),
     [notice, setNotice] = useState("Loading stadium…"),
     [error, setError] = useState(""),
     [cameraMode, setCameraMode] = useState<BallCamera>("chase"),
-    [loading, setLoading] = useState(false);
+    [loading, setLoading] = useState(false),
+    [muted, setMuted] = useState(false),
+    [paused, setPaused] = useState(false);
   const cameraRef = useRef<BallCamera>("chase");
   cameraRef.current = cameraMode;
   const mount = useRef<HTMLDivElement>(null),
-    dialog = useRef<HTMLElement>(null),
+    indicator = useRef<HTMLDivElement>(null),
     held = useRef(new Set<string>()),
     queued = useRef({ jump: false, dodge: false }),
-    close = useRef(onClose);
-  close.current = onClose;
+    audio = useRef<ReturnType<typeof createArcadeAudio> | null>(null),
+    pauseRef = useRef(false);
   const exit = () => {
     link?.socket.emit("ball:exit", link.session.id);
-    close.current();
+    onClose();
+  };
+  const pause = (value: boolean) => {
+    if (link) return;
+    pauseRef.current = value;
+    setPaused(value);
+    held.current.clear();
+    queued.current = { jump: false, dodge: false };
   };
   useEffect(() => {
-    const old = document.activeElement as HTMLElement | null,
-      overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialog.current?.focus();
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        link?.socket.emit("ball:exit", link.session.id);
-        close.current();
-      }
-      if (e.key === "Tab") {
-        const buttons = dialog.current?.querySelectorAll<HTMLButtonElement>(
-          "button:not([disabled])",
-        );
-        if (!buttons?.length) return;
-        const first = buttons[0],
-          last = buttons[buttons.length - 1];
-        if (
-          e.shiftKey &&
-          (document.activeElement === first ||
-            document.activeElement === dialog.current)
-        ) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-    window.addEventListener("keydown", key);
+    audio.current = createArcadeAudio();
     return () => {
-      document.body.style.overflow = overflow;
-      window.removeEventListener("keydown", key);
-      old?.focus();
+      audio.current?.dispose();
+      audio.current = null;
     };
-  }, [link]);
+  }, []);
+  useEffect(() => audio.current?.setMuted(muted), [muted]);
   useEffect(() => {
-    if ((!practice && !link) || !mount.current) return;
+    if (!mount.current) return;
     let disposed = false,
       view: BallView | undefined,
       frame = 0,
@@ -82,7 +70,8 @@ export default function Boostball({
       previousFrame = performance.now(),
       seq = Date.now(),
       lastPacket = performance.now(),
-      hudAt = 0;
+      hudAt = 0,
+      previousGoals = 0;
     const mine = link?.memberId ?? "you";
     const sim = link
       ? null
@@ -133,6 +122,13 @@ export default function Boostball({
       );
     };
     const down = (e: KeyboardEvent) => {
+      if (!isGameInput(e)) return;
+      if (!e.repeat) audio.current?.unlock();
+      if (e.code === "KeyP" && !e.repeat && !latest?.complete) {
+        pause(!pauseRef.current);
+        return;
+      }
+      if (pauseRef.current) return;
       if (
         ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(
           e.code,
@@ -150,7 +146,11 @@ export default function Boostball({
     const up = (e: KeyboardEvent) => held.current.delete(e.code);
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
-    window.addEventListener("blur", reset);
+    const blur = () => {
+      reset();
+      if (!link && !latest?.complete) pause(true);
+    };
+    window.addEventListener("blur", blur);
     link?.socket.on("ball:state", state);
     link?.socket.on("connect", sync);
     link?.socket.on("disconnect", disconnected);
@@ -170,19 +170,18 @@ export default function Boostball({
       .then(({ createBoostballView }) => {
         if (disposed || !mount.current) return;
         try {
-          view = createBoostballView(mount.current, mine, () => {
-            paused = true;
-            held.current.clear();
-            setError(
-              "The 3D graphics context was interrupted. Use Reload stadium to reconnect.",
-            );
-          });
-          if (view.software)
-            setNotice(
-              link
-                ? "Connected · software 3D graphics"
-                : "Practice · You vs Sparky (AI) · software 3D graphics",
-            );
+          view = createBoostballView(
+            mount.current,
+            mine,
+            indicator.current,
+            () => {
+              paused = true;
+              held.current.clear();
+              setError(
+                "The 3D graphics context was interrupted. Use Reload stadium to reconnect.",
+              );
+            },
+          );
           setLoading(false);
           previousFrame = performance.now();
           const animate = (now: number) => {
@@ -192,7 +191,7 @@ export default function Boostball({
               Math.max(0, (now - previousFrame) / 1000),
             );
             previousFrame = now;
-            if (sim) {
+            if (sim && !pauseRef.current) {
               const tick = sim.state.tick;
               sim.advance(
                 dt,
@@ -207,6 +206,9 @@ export default function Boostball({
             }
             const s = latest;
             if (s) {
+              const totalGoals = s.score[0] + s.score[1];
+              if (totalGoals > previousGoals) audio.current?.cue("finish");
+              previousGoals = totalGoals;
               if (now - hudAt > 100) {
                 hudAt = now;
                 setHud({
@@ -255,205 +257,229 @@ export default function Boostball({
       reset();
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
-      window.removeEventListener("blur", reset);
+      window.removeEventListener("blur", blur);
       link?.socket.off("ball:state", state);
       link?.socket.off("connect", sync);
       link?.socket.off("disconnect", disconnected);
       link?.socket.off("party:removed", removed);
     };
-  }, [practice, link, attempt]);
-  const car = hud?.cars.find((c) => c.id === (link?.memberId ?? "you")),
-    score = hud?.score ?? [0, 0];
+  }, [link, attempt]);
+  const car = hud?.cars.find((value) => value.id === (link?.memberId ?? "you"));
+  const score = hud?.score ?? [0, 0];
+  const seconds = Math.ceil(hud?.time ?? 180);
+  const restart = () => {
+    pause(false);
+    setAttempt((value) => value + 1);
+  };
+  const nextCamera = () =>
+    setCameraMode((mode) =>
+      mode === "chase" ? "ball" : mode === "ball" ? "stadium" : "chase",
+    );
   return (
-    <div className="modal">
-      <section
-        className="game-dialog boostball-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Boostball"
-        ref={dialog}
-        tabIndex={-1}
-      >
-        <div className="game-top">
-          <div>
-            <small>
-              BOOSTBALL · {link ? "LIVE MULTIPLAYER" : "3D CAR SOCCER"}
-            </small>
-            <h2>Full throttle. Top corner.</h2>
-          </div>
-          <button onClick={exit} aria-label="Close Boostball">
-            ✕
-          </button>
-        </div>
-        {!practice && !link ? (
-          <div className="ball-welcome">
-            <span className="ball-emblem">⚽</span>
-            <p className="eyebrow">AN ORIGINAL ARCADE SPORT</p>
-            <h3>Small cars. Giant goals.</h3>
+    <PlayScreen
+      name="Boostball"
+      className="play-ball"
+      onExit={exit}
+      exitLabel={link ? "Return to party" : undefined}
+      tools={
+        <>
+          {!link && (
+            <button
+              className="play-icon"
+              disabled={!hud || hud.complete || !!error}
+              aria-label={paused ? "Resume match" : "Pause match"}
+              onClick={() => pause(!paused)}
+            >
+              {paused ? <Play size={18} /> : <Pause size={18} />}
+            </button>
+          )}
+          <PlayOptions>
             <p>
-              A floodlit stadium. Rocket-powered cars. Jump into aerial
-              challenges, boost into the ball, and bank shots past your friends.
+              <strong>
+                Boostball {link ? "· Live party" : "· Practice vs Sparky (AI)"}
+              </strong>
             </p>
-            <div className="ball-features">
-              <span>2–8 friends · balanced teams</span>
-              <span>3-minute matches</span>
-              <span>3D · three camera modes</span>
-              <span>Keyboard & touch</span>
-            </div>
-            <button className="primary" onClick={() => setPractice(true)}>
-              Practice vs AI
+            <p>
+              WASD or arrows to drive. Shift boosts, Space jumps, X dodges, and
+              C changes camera. Jump and boost to reach high balls.
+            </p>
+            <label>
+              Camera
+              <select
+                value={cameraMode}
+                onChange={(event) =>
+                  setCameraMode(event.target.value as BallCamera)
+                }
+              >
+                <option value="chase">Chase camera</option>
+                <option value="ball">Ball camera</option>
+                <option value="stadium">Stadium view</option>
+              </select>
+            </label>
+            <button
+              aria-pressed={muted}
+              onClick={() => {
+                audio.current?.unlock();
+                setMuted(!muted);
+              }}
+            >
+              {muted ? "Turn sound on" : "Mute sound"}
             </button>
-            <button className="secondary" onClick={onFriends}>
-              Play with friends →
-            </button>
-            <p className="muted">
-              Practice is offline against a labeled AI. Online matches require a
-              party and the updated server.
-            </p>
-          </div>
-        ) : (
-          <>
-            <p className="ball-announcement" role="status">
-              {hud?.complete
-                ? score[0] === score[1]
-                  ? "Draw · well played!"
-                  : `${score[0] > score[1] ? "Blue" : "Orange"} team wins!`
-                : hud?.countdown
-                  ? `${hud.goal} · ${Math.ceil(hud.countdown)}`
-                  : `You are ${car?.team ? "ORANGE" : "BLUE"} · attack the ${car?.team ? "BLUE" : "ORANGE"} goal`}
-            </p>
-            <div className="ball-camera-bar" aria-label="Camera mode">
-              {(["chase", "ball", "stadium"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  aria-pressed={cameraMode === mode}
-                  onClick={() => setCameraMode(mode)}
-                >
-                  {mode === "chase"
-                    ? "Chase camera"
-                    : mode === "ball"
-                      ? "Ball camera"
-                      : "Stadium view"}
-                </button>
-              ))}
-              <span>
-                {car && (car.height ?? 0) > 1 ? "AIRBORNE" : "SPACE TO JUMP"}
-              </span>
-            </div>
-            <div className="ball-stage-wrap">
-              <div className="ball-scoreboard">
-                <strong className="ball-blue">
-                  BLUE <b>{score[0]}</b>
-                </strong>
-                <span>
-                  {hud?.complete
-                    ? "FULL TIME"
-                    : `${Math.floor((hud?.time ?? 180) / 60)}:${String(Math.floor((hud?.time ?? 180) % 60)).padStart(2, "0")}`}
-                </span>
-                <strong className="ball-orange">
-                  <b>{score[1]}</b> ORANGE
-                </strong>
-              </div>
-
-              <div
-                className="ball-stage"
-                ref={mount}
-                aria-label="Boostball 3D car soccer stadium"
-              />
-              {(loading || (!hud && !error)) && (
-                <div className="ball-stage-loading" role="status">
-                  {loading
-                    ? "Building the 3D stadium…"
-                    : "Waiting for the live match…"}
-                </div>
-              )}
-            </div>
-            <div className="ball-telemetry">
-              <label>
-                BOOST <progress max={100} value={car?.fuel ?? 100} />
-                {Math.round(car?.fuel ?? 100)}%
-              </label>
-              <span>
-                DODGE {car?.cooldown ? `${car.cooldown.toFixed(1)}s` : "READY"}
-              </span>
-            </div>
-            <p className="muted" role="status">
-              {notice}
-            </p>
-            {error && (
-              <div role="alert" className="ball-graphics-error">
-                <p>{error}</p>
-                <button
-                  className="secondary"
-                  onClick={() => setAttempt((n) => n + 1)}
-                >
-                  Reload stadium
-                </button>
-              </div>
+            {!link && (
+              <>
+                <button onClick={restart}>Restart practice</button>
+                <button onClick={onFriends}>Play with friends</button>
+              </>
             )}
-            <div className="ball-controls">
-              {[
-                ["KeyA", "←", "Steer left"],
-                ["KeyD", "→", "Steer right"],
-                ["KeyW", "GAS", "Accelerate"],
-                ["KeyS", "BRAKE", "Brake or reverse"],
-                ["ShiftLeft", "BOOST", "Boost"],
-                ["Space", "JUMP", "Jump"],
-                ["KeyX", "DODGE", "Dodge burst"],
-              ].map(([code, label, aria]) => (
-                <button
-                  key={code}
-                  aria-label={aria}
-                  disabled={hud?.complete}
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                    if (code === "Space") queued.current.jump = true;
-                    if (code === "KeyX") queued.current.dodge = true;
-                    held.current.add(code);
-                  }}
-                  onPointerUp={() => held.current.delete(code)}
-                  onPointerCancel={() => held.current.delete(code)}
-                  onLostPointerCapture={() => held.current.delete(code)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <p className="muted">
-              W/S or ↑/↓ drive · A/D or ←/→ steer · Shift boost · Space jump · X
-              dodge · C camera. Boost recharges when released. Jump + boost
-              extends airtime.
+            {link && <p role="status">{notice}</p>}
+          </PlayOptions>
+        </>
+      }
+    >
+      <div tabIndex={-1} className="play-field">
+        <div
+          className="ball-stage"
+          ref={mount}
+          aria-label="Boostball 3D car soccer stadium"
+        />
+        <div
+          className="ball-indicator"
+          ref={indicator}
+          hidden
+          aria-hidden="true"
+        >
+          <i />
+        </div>
+      </div>
+      <div
+        className="ball-scoreboard play-hud"
+        aria-label="Boostball score and time"
+      >
+        <strong className="ball-blue">
+          Blue <b>{score[0]}</b>
+        </strong>
+        <span>
+          {hud?.complete
+            ? "FT"
+            : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`}
+        </span>
+        <strong className="ball-orange">
+          <b>{score[1]}</b> Orange
+        </strong>
+      </div>
+      {hud && !hud.complete && (
+        <>
+          {(hud.countdown > 0 ||
+            (link && notice !== "Connected · server-controlled match")) && (
+            <p className="play-message" role="status">
+              {link && notice !== "Connected · server-controlled match"
+                ? notice
+                : `${hud.goal} · ${Math.ceil(hud.countdown)}`}
             </p>
-            {hud?.complete && (
+          )}
+          <div className="play-corner ball-fuel">
+            <span>Boost</span>
+            <progress
+              className="play-meter"
+              max={100}
+              value={car?.fuel ?? 100}
+              aria-label="Boost fuel"
+            />
+            <strong>{Math.round(car?.fuel ?? 100)}%</strong>
+            <span>
+              {car && (car.height ?? 0) > 1
+                ? "Airborne"
+                : car?.cooldown
+                  ? `Dodge ${car.cooldown.toFixed(1)}s`
+                  : "Dodge ready"}
+            </span>
+          </div>
+          <button
+            className="play-camera-icon play-icon"
+            onClick={nextCamera}
+            aria-label="Switch camera"
+            title="Switch camera (C)"
+          >
+            {cameraMode === "chase"
+              ? "Car"
+              : cameraMode === "ball"
+                ? "Ball"
+                : "Wide"}
+          </button>
+          <PlayTouchControls
+            left={driveKeys}
+            right={[
+              ["ArrowDown", "Brake"],
+              ["ArrowUp", "Gas", "Accelerate"],
+              ["ShiftLeft", "Boost"],
+              ["Space", "Jump"],
+              ["KeyX", "Dodge"],
+            ]}
+            disabled={!!error || paused}
+            onKey={(code, down) => {
+              if (!down) {
+                held.current.delete(code);
+                return;
+              }
+              audio.current?.unlock();
+              if (code === "Space") queued.current.jump = true;
+              if (code === "KeyX") queued.current.dodge = true;
+              held.current.add(code);
+            }}
+          />
+        </>
+      )}
+      {(loading || !hud || error || paused || hud.complete) && (
+        <div className="play-center" role={error ? "alert" : undefined}>
+          <h2>
+            {error
+              ? "Stadium unavailable"
+              : hud?.complete
+                ? score[0] === score[1]
+                  ? "Full-time draw"
+                  : `${score[0] > score[1] ? "Blue" : "Orange"} wins`
+                : paused
+                  ? "Paused"
+                  : loading
+                    ? "Loading stadium…"
+                    : "Waiting for the match…"}
+          </h2>
+          {error && <p>{error}</p>}
+          {hud?.complete && (
+            <>
+              <strong className="play-result">
+                {score[0]} – {score[1]}
+              </strong>
               <ol className="planet-scores">
-                {hud.cars.map((c) => (
+                {hud.cars.map((player) => (
                   <li
-                    key={c.id}
-                    className={c.team ? "ball-orange" : "ball-blue"}
+                    key={player.id}
+                    className={player.team ? "ball-orange" : "ball-blue"}
                   >
-                    {c.name} · {c.team ? "Orange" : "Blue"}
-                    {!c.active ? " · left" : ""}
+                    {player.name}
+                    {player.active ? "" : " · left"}
                   </li>
                 ))}
               </ol>
-            )}
-            {!link ? (
-              <button
-                className="secondary"
-                onClick={() => setAttempt((n) => n + 1)}
-              >
-                Restart practice
-              </button>
-            ) : (
-              <p className="muted">
-                Return to your party after full time to ready up for a rematch.
-                Match scores stay in this party.
-              </p>
-            )}
-          </>
-        )}
-      </section>
-    </div>
+            </>
+          )}
+          {error && (
+            <button className="primary" onClick={restart}>
+              Reload stadium
+            </button>
+          )}
+          {paused && !error && !hud?.complete && (
+            <button className="primary" onClick={() => pause(false)}>
+              Resume match
+            </button>
+          )}
+          {hud?.complete && (
+            <button className="primary" onClick={link ? exit : restart}>
+              {link ? "Return to party" : "Play again"}
+            </button>
+          )}
+        </div>
+      )}
+    </PlayScreen>
   );
 }

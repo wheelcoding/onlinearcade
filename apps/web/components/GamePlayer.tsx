@@ -1,316 +1,279 @@
 "use client";
+
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { Pause, Play } from "lucide-react";
 import type { PuzzleDifficulty, GameId } from "@onlinearcade/core";
-import type { GameControl } from "./games/PhaserArcade";
+import type { ArcadeHud, GameControl } from "./games/PhaserArcade";
 import { gameById } from "../lib/catalog";
+import {
+  PlayOptions,
+  PlayScreen,
+  PlayTouchControls,
+  type TouchKey,
+} from "./PlayScreen";
+
 const PhaserArcade = dynamic(() => import("./games/PhaserArcade"), {
   ssr: false,
 });
 const RacingPlayer = dynamic(() => import("./RacingPlayer"), { ssr: false });
-export default function GamePlayer(props: {
+type Props = {
   gameId: GameId;
   onClose: () => void;
   onScore: (score: number) => void;
-}) {
+};
+
+export default function GamePlayer(props: Props) {
   return props.gameId === "sunset-circuit" ? (
     <RacingPlayer onClose={props.onClose} onScore={props.onScore} />
   ) : (
     <ArcadePlayer {...props} />
   );
 }
-function ArcadePlayer({
-  gameId,
-  onClose,
-  onScore,
-}: {
-  gameId: GameId;
-  onClose: () => void;
-  onScore: (score: number) => void;
-}) {
-  const game = gameById(gameId),
-    control = useRef<GameControl | null>(null),
-    dialog = useRef<HTMLDivElement>(null),
-    [hud, setHud] = useState({
-      score: 0,
-      detail: "Loading engine…",
-      ended: false,
-    }),
-    [error, setError] = useState(""),
-    [paused, setPaused] = useState(false),
-    [help, setHelp] = useState(true),
-    [muted, setMuted] = useState(false),
-    [puzzleDifficulty, setPuzzleDifficulty] =
-      useState<PuzzleDifficulty>("normal"),
-    [nextDifficulty, setNextDifficulty] = useState<PuzzleDifficulty>("normal");
-  const close = useRef(onClose);
-  close.current = onClose;
+
+const horizontal: readonly TouchKey[] = [
+  ["ArrowLeft", "←", "Move left"],
+  ["ArrowRight", "→", "Move right"],
+];
+
+function ArcadePlayer({ gameId, onClose, onScore }: Props) {
+  const game = gameById(gameId);
+  const puzzle = gameId === "tile-shift";
+  const control = useRef<GameControl | null>(null);
+  const [hud, setHud] = useState<ArcadeHud | null>(null);
+  const [error, setError] = useState("");
+  const [paused, setPaused] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [difficulty, setDifficulty] = useState<PuzzleDifficulty>("normal");
+  const [engine, setEngine] = useState(0);
+
+  function pause(value: boolean) {
+    if (!control.current || hud?.ended) return;
+    control.current.pause(value);
+    setPaused(value);
+  }
+
+  function restart() {
+    setPaused(false);
+    if (control.current && !error) {
+      control.current.restart();
+    } else {
+      setError("");
+      setHud(null);
+      setEngine((value) => value + 1);
+    }
+  }
+
+  function press(key: string) {
+    control.current?.key(key, true);
+    control.current?.key(key, false);
+  }
+
   useEffect(() => {
-    const before = document.activeElement as HTMLElement | null;
-    const old = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialog.current?.focus();
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close.current();
-      if (e.key === "Tab") {
-        const nodes = dialog.current?.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), select, [tabindex="0"]',
-        );
-        if (!nodes?.length) return;
-        const first = nodes[0],
-          last = nodes[nodes.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
     const hidden = () => {
-      if (document.hidden) {
-        control.current?.pause(true);
+      if (document.hidden && control.current) {
+        control.current.pause(true);
         setPaused(true);
       }
     };
-    window.addEventListener("keydown", key);
     document.addEventListener("visibilitychange", hidden);
-    return () => {
-      window.removeEventListener("keydown", key);
-      document.removeEventListener("visibilitychange", hidden);
-      document.body.style.overflow = old;
-      before?.focus();
-    };
+    return () => document.removeEventListener("visibilitychange", hidden);
   }, []);
-  const Engine = PhaserArcade;
-  function togglePause() {
-    control.current?.pause(!paused);
-    setPaused(!paused);
-  }
+
+  const ready = !!hud && !error;
+  const clock = Math.floor(hud?.time ?? 0);
+  const status = puzzle
+    ? `${hud?.moves ?? 0} moves`
+    : gameId === "neon-dash"
+      ? `${Math.floor((hud?.distance ?? 0) / 10)} m`
+      : gameId === "starfall"
+        ? `Wave ${hud?.wave ?? 1}`
+        : `Sector ${hud?.sector ?? 1}/3`;
+  const actionKeys: readonly TouchKey[] =
+    gameId === "neon-dash"
+      ? [
+          ["ShiftLeft", "Phase dash"],
+          ["Space", "Jump"],
+        ]
+      : gameId === "starfall"
+        ? [["Space", "Nova burst"]]
+        : [["Space", "Launch ball"]];
+
   return (
-    <div className="modal game-modal">
-      <div
-        className="game-dialog advanced-dialog"
-        ref={dialog}
-        role="dialog"
-        aria-modal="true"
-        aria-label={game.title}
-        tabIndex={-1}
-      >
-        <div className="game-top">
-          <div>
-            <span className="eyebrow">{game.type} · LOCAL RUN</span>
-            <h2>{game.title}</h2>
-          </div>
-          <span className="score">
-            {gameId === "sunset-circuit" && !hud.ended
-              ? "TIME TRIAL"
-              : hud.score.toString().padStart(5, "0")}
-          </span>
-          <button onClick={onClose} aria-label="Close game">
-            ✕
+    <PlayScreen
+      name={game.title}
+      className={`play-fixed-world play-${gameId} ${puzzle ? "play-puzzle" : ""}`}
+      onExit={onClose}
+      tools={
+        <>
+          <button
+            className="play-icon"
+            aria-label={paused ? "Resume game" : "Pause game"}
+            title={paused ? "Resume game (P)" : "Pause game (P)"}
+            disabled={!ready || hud.ended}
+            onClick={() => pause(!paused)}
+          >
+            {paused ? <Play size={18} /> : <Pause size={18} />}
           </button>
-        </div>
-        {gameId === "tile-shift" && (
-          <div className="puzzle-toolbar">
-            <label>
-              Puzzle difficulty{" "}
-              <select
-                value={nextDifficulty}
-                onChange={(e) =>
-                  setNextDifficulty(e.target.value as PuzzleDifficulty)
-                }
-              >
-                <option value="easy">Easy · warm up</option>
-                <option value="normal">Normal · find your flow</option>
-                <option value="hard">Hard · deep shuffle</option>
-              </select>
-            </label>
-            <button
-              onClick={() => {
-                if (nextDifficulty === puzzleDifficulty)
-                  control.current?.restart();
-                else setPuzzleDifficulty(nextDifficulty);
-                setPaused(false);
-                control.current?.pause(false);
-              }}
-            >
-              New puzzle
+          <PlayOptions>
+            <p>
+              <strong>{game.title}</strong>
+            </p>
+            <p>{game.controls}</p>
+            <p>{game.objective}</p>
+            {puzzle && (
+              <label>
+                Puzzle difficulty
+                <select
+                  value={difficulty}
+                  onChange={(event) => {
+                    setDifficulty(event.target.value as PuzzleDifficulty);
+                    setHud(null);
+                    setPaused(false);
+                    setError("");
+                  }}
+                >
+                  <option value="easy">Easy</option>
+                  <option value="normal">Normal</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </label>
+            )}
+            <button onClick={restart}>
+              {puzzle ? "New puzzle" : "Restart run"}
             </button>
             <button
-              disabled={hud.ended || paused || !!error}
-              onClick={() => {
-                control.current?.key("KeyU", true);
-                control.current?.key("KeyU", false);
-              }}
+              aria-pressed={muted}
+              onClick={() => setMuted((value) => !value)}
             >
-              ↶ Undo · −120
+              {muted ? "Turn sound on" : "Mute sound"}
             </button>
-            <button
-              disabled={hud.ended || paused || !!error}
-              onClick={() => {
-                control.current?.key("KeyH", true);
-                control.current?.key("KeyH", false);
-              }}
-            >
-              ◇ Hint · −600
-            </button>
-          </div>
-        )}
-        <div
-          className={`engine-stage ${gameId === "tile-shift" ? "puzzle-stage" : ""}`}
-        >
-          <Engine
-            muted={muted}
-            puzzleDifficulty={puzzleDifficulty}
-            onPauseRequest={togglePause}
-            gameId={gameId}
-            onScore={onScore}
-            onHud={setHud}
-            onError={setError}
-            control={control}
-          />
-          {(paused || hud.ended || error) && (
-            <div className="engine-overlay">
-              <span className="eyebrow">
-                {error
-                  ? "ENGINE NOTICE"
-                  : hud.ended
-                    ? "RUN COMPLETE"
-                    : "TAKE A BREATHER"}
+          </PlayOptions>
+        </>
+      }
+    >
+      <div tabIndex={-1} className="play-field">
+        <PhaserArcade
+          key={engine}
+          muted={muted}
+          puzzleDifficulty={difficulty}
+          onPauseRequest={() => pause(!paused)}
+          gameId={gameId}
+          onScore={onScore}
+          onHud={setHud}
+          onError={setError}
+          control={control}
+        />
+      </div>
+      {ready && (
+        <div className="play-hud arcade-hud" aria-label={hud.detail}>
+          <span>{status}</span>
+          {puzzle ? (
+            <>
+              <strong>
+                {Math.floor(clock / 60)}:{String(clock % 60).padStart(2, "0")}
+              </strong>
+              <span className="hud-extra">{hud.inPlace}/15 placed</span>
+            </>
+          ) : (
+            <>
+              <strong>{hud.score.toLocaleString()}</strong>
+              <span className="play-lives" aria-label={`${hud.lives} left`}>
+                {"◆".repeat(Math.max(0, hud.lives))}
+                {"◇".repeat(Math.max(0, 3 - hud.lives))}
               </span>
-              <h2>
-                {error
-                  ? "Couldn’t start"
-                  : hud.ended
-                    ? "Nicely played."
-                    : "Paused"}
-              </h2>
-              <p>{error || hud.detail}</p>
-              {!error &&
-                (hud.ended ? (
-                  <>
-                    <strong>
-                      {hud.score.toLocaleString()} <small>POINTS</small>
-                    </strong>
-                    <button
-                      className="primary"
-                      onClick={() => {
-                        control.current?.restart();
-                        setPaused(false);
-                        control.current?.pause(false);
-                      }}
-                    >
-                      Play again ↻
-                    </button>
-                  </>
-                ) : (
-                  <button className="primary" onClick={togglePause}>
-                    Resume game ▷
-                  </button>
-                ))}
-            </div>
+            </>
           )}
         </div>
-        <div className="engine-status" aria-live="polite">
-          {hud.detail}
-        </div>
-        <div className="game-toolbar">
-          <button
-            onClick={togglePause}
-            disabled={hud.ended || !!error || hud.detail === "Loading engine…"}
-          >
-            {paused ? "▷ Resume" : "Ⅱ Pause"}
-          </button>
-          <button
-            onClick={() => {
-              control.current?.restart();
-              control.current?.pause(false);
-              setPaused(false);
-            }}
-            disabled={!!error || hud.detail === "Loading engine…"}
-          >
-            ↻ Restart
-          </button>
-          <button aria-pressed={muted} onClick={() => setMuted(!muted)}>
-            {muted ? "Sound off" : "Sound on"}
-          </button>
-          <button onClick={() => setHelp(!help)} aria-expanded={help}>
-            ? How to play
-          </button>
-          <button
-            onClick={async () => {
-              try {
-                if (document.fullscreenElement) await document.exitFullscreen();
-                else await dialog.current?.requestFullscreen();
-              } catch {
-                setHelp(true);
+      )}
+      {ready &&
+        !paused &&
+        !hud.ended &&
+        (gameId === "neon-dash" || gameId === "starfall") && (
+          <div className="play-corner">
+            <span>{gameId === "neon-dash" ? "Phase" : "Nova"}</span>
+            <progress
+              className="play-meter"
+              max={100}
+              value={hud.energy}
+              aria-label={
+                gameId === "neon-dash" ? "Phase charge" : "Nova charge"
               }
-            }}
-          >
-            ⛶ Fullscreen
-          </button>
-        </div>
-        {help && (
-          <div className="game-instructions">
-            <b>{game.controls}</b>
-            <p>{game.objective}</p>
-            {gameId === "sunset-circuit" && (
-              <small>Space recovers your kart to the latest checkpoint.</small>
+            />
+            <strong>
+              {(
+                gameId === "neon-dash"
+                  ? hud.energy >= 40 && hud.dashCooldown <= 0
+                  : hud.energy >= 100
+              )
+                ? "Ready"
+                : `${Math.floor(hud.energy)}%`}
+            </strong>
+            {gameId === "neon-dash" && hud.chain > 1 && (
+              <span>×{hud.chain}</span>
             )}
           </div>
         )}
-        <div className="touch-controls suite-controls">
-          {[
-            ["ArrowLeft", "←"],
-            ["ArrowRight", "→"],
-            ["ArrowUp", gameId === "sunset-circuit" ? "GAS ↑" : "↑"],
-            ["ArrowDown", gameId === "sunset-circuit" ? "BRAKE ↓" : "↓"],
-            [
-              "Space",
-              gameId === "neon-dash"
-                ? "JUMP ↑"
-                : gameId === "starfall"
-                  ? "NOVA ◇"
-                  : "LAUNCH",
-            ],
-            ...(gameId === "neon-dash" ? [["ShiftLeft", "DASH ⚡"]] : []),
-          ]
-            .filter(
-              ([k]) =>
-                (gameId !== "tile-shift" || k !== "Space") &&
-                (gameId !== "neon-dash" ||
-                  (k !== "ArrowDown" && k !== "ArrowUp")) &&
-                (gameId !== "prism-break" ||
-                  (k !== "ArrowUp" && k !== "ArrowDown")),
-            )
-            .map(([key, label]) => (
-              <button
-                key={key}
-                aria-label={
-                  key === "Space"
-                    ? gameId === "neon-dash"
-                      ? "Jump"
-                      : gameId === "starfall"
-                        ? "Nova burst"
-                        : "Launch ball"
-                    : key === "ShiftLeft"
-                      ? "Phase dash"
-                      : key.replace("Arrow", "Move ")
-                }
-                onPointerDown={(e) => {
-                  e.currentTarget.setPointerCapture(e.pointerId);
-                  control.current?.key(key, true);
-                }}
-                onPointerUp={() => control.current?.key(key, false)}
-                onPointerCancel={() => control.current?.key(key, false)}
-              >
-                {label}
-              </button>
-            ))}
+      {puzzle ? (
+        <div className="play-puzzle-bar">
+          <button
+            disabled={!ready || hud.ended || paused || !hud.canUndo}
+            onClick={() => press("KeyU")}
+          >
+            Undo <span>−120</span>
+          </button>
+          <button
+            disabled={!ready || hud.ended || paused}
+            onClick={() => press("KeyH")}
+          >
+            Hint <span>−600</span>
+          </button>
+          <button onClick={restart}>New puzzle</button>
         </div>
-      </div>
-    </div>
+      ) : (
+        <PlayTouchControls
+          left={gameId === "starfall" ? [] : horizontal}
+          right={actionKeys}
+          disabled={!ready || hud.ended || paused}
+          onKey={(key, down) => control.current?.key(key, down)}
+        />
+      )}
+      {(!ready || paused || hud.ended) && (
+        <div className="play-center" role={error ? "alert" : undefined}>
+          <h2>
+            {error
+              ? "Game unavailable"
+              : !ready
+                ? `Loading ${game.title}…`
+                : hud.ended
+                  ? hud.won
+                    ? "Challenge complete"
+                    : "Run complete"
+                  : "Paused"}
+          </h2>
+          {(error || (hud?.ended && hud.detail)) && (
+            <p>{error || hud?.detail}</p>
+          )}
+          {hud?.ended && (
+            <strong className="play-result">
+              {hud.score.toLocaleString()} pts
+            </strong>
+          )}
+          {(ready || error) && (
+            <button
+              className="primary"
+              onClick={paused && !hud?.ended ? () => pause(false) : restart}
+            >
+              {error ? "Try again" : hud?.ended ? "Play again" : "Resume game"}
+            </button>
+          )}
+          {hud?.ended && (
+            <button className="secondary" onClick={onClose}>
+              Back to arcade
+            </button>
+          )}
+        </div>
+      )}
+    </PlayScreen>
   );
 }

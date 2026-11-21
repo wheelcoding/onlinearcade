@@ -148,6 +148,23 @@ test("nova requires full charge and removes enemy shots without granting invinci
   ticks(s, 120);
   assert.equal(s.invulnerable, 0);
 });
+test("Prism Break launches inward from either side and straight from the center", () => {
+  for (const [x, direction] of [
+    [100, 1],
+    [480, 0],
+    [860, -1],
+  ]) {
+    const game = ready("prism-break");
+    game.step({ ...noArcadeInput(), pointer: { x, y: 480 } });
+    const preview = game.prismLaunch;
+    game.step({ ...noArcadeInput(), pointer: { x, y: 480 }, action: true });
+    assert.equal(game.ball.active, true);
+    assert.equal(Math.sign(game.ball.vx), direction);
+    assert.equal(game.ball.vx, preview.vx);
+    assert.equal(game.ball.vy, preview.vy);
+    assert.ok(game.ball.vy < 0);
+  }
+});
 test("breaker armored crystals take two hits and sectors use different layouts", () => {
   const s = ready("prism-break");
   const firstCrystal = s.crystals[0];

@@ -67,65 +67,6 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
     g.fillStyle(color, alpha);
     g.fillRoundedRect(x, y, w, h, r);
   }
-  function hud(sim: ArcadeSimulation) {
-    if (kind === "tile-shift") return;
-    rect(20, 16, 920, 39, 0x0d1424, 10, 0.83);
-    text(
-      0,
-      kind === "neon-dash"
-        ? "N E O N  D A S H"
-        : kind === "starfall"
-          ? "S T A R F A L L"
-          : "P R I S M  B R E A K",
-      35,
-      29,
-      12,
-    );
-    text(
-      1,
-      Array.from({ length: 3 }, (_, i) => (i < sim.lives ? "◆" : "◇")).join(
-        " ",
-      ),
-      262,
-      26,
-      18,
-      sim.lives === 1 ? "#f99baa" : "#b1ecd3",
-    );
-    text(
-      2,
-      kind === "neon-dash"
-        ? `${Math.floor(sim.distance / 10)}m  ·  CHAIN ×${sim.combo}`
-        : kind === "starfall"
-          ? `WAVE ${sim.wave}  ·  ${sim.kills} KILLS`
-          : `SECTOR ${sim.stage}/3  ·  CHAIN ×${sim.hitCombo}`,
-      390,
-      29,
-      12,
-    );
-    const energy =
-      kind === "prism-break" ? (sim.crystals.length / 48) * 100 : sim.energy;
-    rect(720, 31, 155, 5, 0x405163, 2);
-    rect(
-      720,
-      31,
-      Math.max(1, energy * 1.55),
-      5,
-      kind === "neon-dash" ? 0xbb9ef2 : 0xa3ebd3,
-      2,
-    );
-    text(
-      3,
-      kind === "neon-dash"
-        ? "SHIFT · PHASE"
-        : kind === "starfall"
-          ? "SPACE · NOVA"
-          : `${sim.crystals.length} LEFT`,
-      780,
-      41,
-      7,
-      "#b6c6d0",
-    );
-  }
   return {
     draw: (
       sim: ArcadeSimulation,
@@ -136,8 +77,8 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
       fx.clear();
       labels.forEach((l) => l.setVisible(false));
       const t = sim.time,
-        w = kind === "tile-shift" ? 640 : 960,
-        h = kind === "tile-shift" ? 640 : 540;
+        w = kind === "tile-shift" ? 400 : 960,
+        h = kind === "tile-shift" ? 400 : 540;
       g.fillStyle(
         kind === "neon-dash"
           ? 0x12142b
@@ -184,7 +125,21 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
           g.lineBetween(x, y, x - 5, y + 13);
         }
         for (const o of sim.obstacles) {
-          glow(o.x + o.width / 2, o.y + o.height / 2, 30, 0xf18da9);
+          const secondsAway = (o.x - sim.player.x) / sim.speed;
+          const danger = secondsAway > 0 && secondsAway < 0.5 && sim.dash <= 0;
+          glow(
+            o.x + o.width / 2,
+            o.y + o.height / 2,
+            danger ? 42 : 26,
+            danger ? 0xff985c : 0xf18da9,
+          );
+          if (danger) {
+            rect(o.x - 9, 446, o.width + 18, 5, 0xffad73, 2, 0.72);
+            for (let n = 0; n < o.width; n += 12) {
+              g.lineStyle(2, 0xffdfad, 0.58);
+              g.lineBetween(o.x + n, 457, o.x + n + 8, 450);
+            }
+          }
           if (o.kind === "drone") {
             rect(o.x, o.y, o.width, o.height, 0x5a3b69, 9);
             rect(o.x + 5, o.y + 6, o.width - 10, 5, 0xf8a3c6, 2);
@@ -249,9 +204,8 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
             g.lineStyle(2, 0xffd8a6, 0.6);
             g.strokeEllipse(p.x, p.y, 51, 59);
           }
-          const stretch = 1;
           glow(p.x, p.y, 30, sim.dash > 0 ? 0xc5a5fc : 0x8be4d1);
-          rect(p.x - 17, p.y - 21, 34, 42 * stretch, 0x7fc7bb, 7);
+          rect(p.x - 17, p.y - 21, 34, 42, 0x7fc7bb, 7);
           rect(p.x - 14, p.y - 19, 28, 6, 0xc4ffeb, 3);
           rect(p.x - 8, p.y - 10, 28, 14, 0x394666, 5);
           rect(p.x + 6, p.y - 8, 8, 7, 0xb4dbf6, 2);
@@ -299,6 +253,25 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
             y = e.y,
             boss = e.kind === "boss";
           glow(x, y, boss ? 80 : 25, 0xa97fba);
+          // Telegraph the gunners' real fire timer instead of guessing from the animation.
+          if (
+            (boss || e.kind === "gunner") &&
+            e.fire > 0 &&
+            e.fire < 0.3 &&
+            y > 20
+          ) {
+            const radius = (boss ? 34 : 15) + e.fire * 47;
+            g.lineStyle(2, 0xffc18b, 1 - e.fire * 2);
+            g.strokeCircle(x, y + 18, radius);
+            const angle = Math.atan2(sim.player.y - y, sim.player.x - x);
+            g.lineStyle(1, 0xffad86, 0.6);
+            g.lineBetween(
+              x,
+              y + 19,
+              x + Math.cos(angle) * 64,
+              y + 19 + Math.sin(angle) * 64,
+            );
+          }
           if (boss) {
             poly(
               [
@@ -371,6 +344,13 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
           }
         }
         const p = sim.player;
+        if (sim.energy >= 100) {
+          const pulse = 1 + Math.sin(t * 4) * 0.09;
+          g.lineStyle(2, 0x8ff7ed, 0.8);
+          g.strokeCircle(p.x, p.y, 37 * pulse);
+          g.lineStyle(1, 0xc2edff, 0.35);
+          g.strokeCircle(p.x, p.y, 43 * pulse);
+        }
         if (sim.invulnerable <= 0 || Math.floor(t * 14) % 2 === 0) {
           glow(p.x, p.y, 40, 0x7fe4ce);
           poly(
@@ -484,7 +464,23 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
         rect(x + half - 22, 496, 14, 6, 0x7be4d5, 2);
         if (!b.active && !sim.stageWait && !sim.ended) {
           g.lineStyle(1, 0xc9eadc, 0.3);
-          g.lineBetween(b.x, b.y - 20, b.x + 40, b.y - 100);
+          const velocity = sim.prismLaunch;
+          for (let i = 1; i <= 12; i++) {
+            const step = i * 0.043;
+            const predicted = b.x + velocity.vx * step;
+            const x =
+              predicted < 18
+                ? 36 - predicted
+                : predicted > 942
+                  ? 1884 - predicted
+                  : predicted;
+            g.fillStyle(0xa5f4e0, 0.9 - i * 0.048);
+            g.fillCircle(
+              x,
+              b.y + velocity.vy * step,
+              Math.max(1.6, 4 - i * 0.18),
+            );
+          }
           text(5, "SPACE / TAP TO LAUNCH", 480, 355, 13, "#cbdedb", true);
         }
         text(
@@ -498,23 +494,13 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
         );
       }
       if (kind === "tile-shift") {
-        glow(320, 310, 210, 0x396475);
-        text(0, "T I L E   S H I F T", 320, 25, 18, "#e7e8d2", true);
-        text(
-          1,
-          `${sim.puzzleDifficulty.toUpperCase()}  ·  ${sim.moves} MOVES  ·  ${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`,
-          320,
-          57,
-          11,
-          "#9cbcc4",
-          true,
-        );
-        rect(118, 114, 404, 404, 0x0a1c28, 22);
-        g.lineStyle(1, 0x8bb4be, 0.2);
-        g.strokeRoundedRect(118, 114, 404, 404, 22);
+        glow(200, 200, 175, 0x5b9187);
+        rect(3, 3, 394, 394, 0x0a1c28, 19);
+        g.lineStyle(1, 0x99d7c3, 0.35);
+        g.strokeRoundedRect(3, 3, 394, 394, 19);
         for (let i = 0; i < 16; i++) {
-          const x = 136 + (i % 4) * 94,
-            y = 132 + Math.floor(i / 4) * 94;
+          const x = 16 + (i % 4) * 94,
+            y = 16 + Math.floor(i / 4) * 94;
           rect(x, y, 85, 85, 0x1c3541, 12);
           if (!sim.board[i]) {
             g.lineStyle(1, 0x87b5ba, 0.25);
@@ -525,9 +511,9 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
           if (!n) return;
           const from = sim.previousBoard.indexOf(n),
             ratio = 1 - (sim.anim / 0.14) ** 3,
-            x = 136 + ((from % 4) * (1 - ratio) + (i % 4) * ratio) * 94,
+            x = 16 + ((from % 4) * (1 - ratio) + (i % 4) * ratio) * 94,
             y =
-              132 +
+              16 +
               (Math.floor(from / 4) * (1 - ratio) + Math.floor(i / 4) * ratio) *
                 94,
             correct = n === i + 1,
@@ -571,18 +557,6 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
             g.fillCircle(x + 72, y + 13, 3);
           }
         });
-        const solved = sim.board.filter((n, i) => n && n === i + 1).length;
-        rect(125, 565, 390, 5, 0x34505c, 3);
-        rect(125, 565, Math.max(1, (solved / 15) * 390), 5, 0xb6ddbf, 3);
-        text(
-          2,
-          `${solved}/15 TILES IN PLACE  ·  GOAL: 1 → 15, THEN GAP`,
-          320,
-          584,
-          10,
-          "#a8c8ca",
-          true,
-        );
       }
       if (kind !== "tile-shift")
         for (const d of sim.drops) {
@@ -598,10 +572,9 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
             rect(d.x - 9, d.y - 4, 18, 8, 0xd5bcf0, 3);
           }
         }
-      hud(sim);
       for (const ev of sim.takeEvents()) {
-        const x = kind === "tile-shift" ? ev.x - 156 : ev.x,
-          y = kind === "tile-shift" ? ev.y + 67 : ev.y,
+        const x = kind === "tile-shift" ? ev.x - 276 : ev.x,
+          y = kind === "tile-shift" ? ev.y - 49 : ev.y,
           count = ev.kind === "shot" ? 0 : ev.kind === "clear" ? 20 : 10;
         for (let i = 0; i < count && particles.length < 280; i++) {
           const a = i * 2.4,
@@ -652,7 +625,7 @@ export function createArcadeArt(scene: Phaser.Scene, kind: string) {
       } else if (sim.messageTime > 0 && !sim.ended) {
         const y =
           kind === "tile-shift"
-            ? 90
+            ? 5
             : kind === "starfall"
               ? 130
               : kind === "prism-break"

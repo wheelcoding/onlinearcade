@@ -1,6 +1,6 @@
 # OnlineArcade
 
-An original, responsive browser arcade built with Next.js, React, TypeScript, Tailwind, Phaser, Three.js, Node.js and Socket.IO. Artwork is original CSS and procedural Phaser graphics; no downloaded assets or keys required.
+An original, responsive browser arcade built with Next.js, React, TypeScript, Tailwind, Phaser, Three.js, Node.js and Socket.IO. The lobby uses original illustrations and Boostball cover art. Game graphics are generated locally with Phaser, Three.js and Canvas.
 
 ## Local development
 
@@ -18,6 +18,12 @@ npm run check
 npm test
 npm run build
 ```
+
+## Playing
+
+Choose **Play** to start a game in a full-screen view. Use the X button or Escape to return to the library. Game Options holds controls, audio, and restart. On phones the action buttons sit at the bottom of the screen. The 2D games keep their aspect ratio so the whole board stays visible.
+
+Sunset Circuit opens a quick race on Sunset Bay. Choose **Game options → Choose track and mode** to change tracks, tune the kart, or start a Time Trial. Boostball and Party Planet open in practice. Choose **Friends** on a multiplayer game card to select it in your party.
 
 ## Workspaces
 
@@ -136,7 +142,7 @@ On each page load, the homepage shows only `wheelcoding` on white. On phones, ta
 
 ### Boostball 3D · multiplayer car soccer
 
-Open **Boostball** in the library to practice against **Sparky (AI)**, or choose **Play with friends** to select it in the party lobby. Invite 1–7 friends, have everyone ready up, and let the host start. Players are assigned alternately to blue and orange teams (odd-sized parties differ by one player). Attack the opposite-colored goal; the most goals after three minutes wins, with a draw for tied scores. Return to the lobby and ready up for a rematch.
+Open **Boostball** to practice against **Sparky (AI)**, or choose **Friends** on its card to select it in the party lobby. Invite 1–7 friends, have everyone ready up, and let the host start. Players are assigned alternately to blue and orange teams (odd-sized parties differ by one player). Attack the opposite-colored goal; the most goals after three minutes wins, with a draw for tied scores. Return to the lobby and ready up for a rematch.
 
 Drive with WASD or arrows; Shift boosts, Space jumps, X performs a forward dodge burst, and C cycles cameras. Mobile has seven simultaneous touch buttons. Boost recharges when released and extends airtime while airborne. A Three.js stadium replaces the top-down view: original beveled cars, animated wheels/exhaust, goal nets, grandstands, floodlights, turf, city skyline and goal particles. Choose chase, ball-follow or elevated stadium cameras. WebGL supports shadows and textured lighting; a genuine perspective-projected software renderer uses the same 3D scene when WebGL is unavailable, with flat lighting and fewer effects. Both modes use the same fixed 120 Hz simulation for practice and server matches, including vertical car/ball motion, gravity, bouncing, aerial contact and crossbar-height goal validation. Multiplayer physics, collisions, kickoff countdowns, clock, teams and goals run on the server. Clients submit only validated controls at 30 Hz; room-only snapshots arrive at 15 Hz. Stale/disconnected input expires after 300 ms, and existing party reconnection restores an active match. Leaving withdraws that car. Results stay in the party; they are not submitted to account leaderboards.
 

@@ -1,4 +1,6 @@
 import "./globals.css";
+import "./arcade-home.css";
+import "./play-screen.css";
 export const metadata = {
   title: "wheelcoding",
   description:

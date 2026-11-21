@@ -7,6 +7,7 @@ import {
   type PuzzleDifficulty,
   type GameId,
 } from "@onlinearcade/core";
+import { isGameInput } from "../PlayScreen";
 import { createArcadeArt } from "./arcade-renderer";
 import { createArcadeAudio } from "../../lib/arcade-audio";
 export type GameControl = {
@@ -14,10 +15,27 @@ export type GameControl = {
   restart: () => void;
   pause: (paused: boolean) => void;
 };
-export type EngineProps = {
+export type ArcadeHud = {
+  score: number;
+  detail: string;
+  ended: boolean;
+  won: boolean;
+  lives: number;
+  energy: number;
+  dashCooldown: number;
+  distance: number;
+  chain: number;
+  wave: number;
+  sector: number;
+  moves: number;
+  time: number;
+  inPlace: number;
+  canUndo: boolean;
+};
+export type EngineProps<Hud = ArcadeHud> = {
   gameId: GameId;
   onScore: (score: number) => void;
-  onHud: (hud: { score: number; detail: string; ended: boolean }) => void;
+  onHud: (hud: Hud) => void;
   onError: (message: string) => void;
   control: React.RefObject<GameControl | null>;
   muted?: boolean;
@@ -39,7 +57,8 @@ export default function PhaserArcade({
   callbacks.current = { onScore, onHud, onError, muted, onPauseRequest };
   useEffect(() => {
     let disposed = false,
-      game: Phaser.Game | undefined;
+      game: Phaser.Game | undefined,
+      resize: ResizeObserver | undefined;
     const audio = createArcadeAudio();
     import("phaser")
       .then(({ default: P }) => {
@@ -60,12 +79,10 @@ export default function PhaserArcade({
           pointerMode = false;
           tap: { x: number; y: number } | undefined;
           seed = Date.now();
-          jumpPulse = 0;
           actionPulse = 0;
           create() {
             this.keys.clear();
             this.canvasJumps.clear();
-            this.jumpPulse = 0;
             this.actionPulse = 0;
             this.pointerMode = false;
             this.dragging = false;
@@ -130,12 +147,7 @@ export default function PhaserArcade({
               }
             };
             this.input.keyboard!.on("keydown", (e: KeyboardEvent) => {
-              if (
-                e.target instanceof HTMLSelectElement ||
-                e.target instanceof HTMLInputElement ||
-                e.target instanceof HTMLTextAreaElement
-              )
-                return;
+              if (!isGameInput(e)) return;
               if (
                 [
                   "ArrowLeft",
@@ -157,10 +169,13 @@ export default function PhaserArcade({
               if (this.paused || this.sim.ended) return;
               this.dragging = true;
               this.pointerMode = true;
-              this.pointer = { x: p.x, y: p.y };
+              this.pointer = {
+                x: p.x,
+                y: p.y - (p.wasTouch && gameId === "starfall" ? 64 : 0),
+              };
               this.tap =
                 gameId === "tile-shift"
-                  ? { x: p.x + 156, y: p.y - 67 }
+                  ? { x: p.x + 276, y: p.y + 49 }
                   : { x: p.x, y: p.y };
               if (gameId === "neon-dash") {
                 this.canvasJumps.add(p.id);
@@ -169,7 +184,10 @@ export default function PhaserArcade({
             });
             this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
               this.pointerMode = true;
-              this.pointer = { x: p.x, y: p.y };
+              this.pointer = {
+                x: p.x,
+                y: p.y - (p.wasTouch && gameId === "starfall" ? 64 : 0),
+              };
             });
             this.input.on("pointerup", (p: Phaser.Input.Pointer) => {
               this.dragging = false;
@@ -183,7 +201,6 @@ export default function PhaserArcade({
               this.keys.clear();
               this.canvasJumps.clear();
               this.sim.clearInput();
-              this.jumpPulse = 0;
               this.actionPulse = 0;
               this.dragging = false;
               this.pointer = null;
@@ -207,7 +224,6 @@ export default function PhaserArcade({
                 this.keys.clear();
                 this.canvasJumps.clear();
                 this.sim.clearInput();
-                this.jumpPulse = 0;
                 this.actionPulse = 0;
                 this.dragging = false;
                 this.tap = undefined;
@@ -224,6 +240,20 @@ export default function PhaserArcade({
                   this.sim.detail
                 : this.sim.detail,
               ended: this.sim.ended,
+              won: this.sim.won,
+              lives: this.sim.lives,
+              energy: this.sim.energy,
+              dashCooldown: this.sim.dashCooldown,
+              distance: this.sim.distance,
+              chain: this.sim.combo,
+              wave: this.sim.wave,
+              sector: this.sim.stage,
+              moves: this.sim.moves,
+              time: this.sim.time,
+              inPlace: this.sim.board.filter(
+                (value, index) => value === index + 1,
+              ).length,
+              canUndo: this.sim.history.length > 0,
             });
           }
           update(now: number, delta: number) {
@@ -231,6 +261,8 @@ export default function PhaserArcade({
             audio.setMuted(callbacks.current.muted);
             const dt = Math.min(0.1, delta / 1000);
             if (!this.sim.ended) {
+              // A tap made during the tile slide is applied once the board settles.
+              const sliding = gameId === "tile-shift" && this.sim.anim > 0;
               const input = {
                 x:
                   Number(this.held("ArrowRight") || this.held("KeyD")) -
@@ -249,7 +281,7 @@ export default function PhaserArcade({
                       this.held("ShiftRight") ||
                       this.held("KeyX")
                     : this.held("Space")),
-                tap: this.tap,
+                tap: sliding ? undefined : this.tap,
                 pointer:
                   gameId === "prism-break" && this.pointerMode
                     ? this.pointer || undefined
@@ -259,8 +291,7 @@ export default function PhaserArcade({
               };
               const steps = this.sim.advance(dt, input);
               if (steps) {
-                this.tap = undefined;
-                this.jumpPulse = Math.max(0, this.jumpPulse - dt);
+                if (!sliding) this.tap = undefined;
                 this.actionPulse = Math.max(0, this.actionPulse - dt);
               }
             }
@@ -278,21 +309,24 @@ export default function PhaserArcade({
         game = new P.Game({
           type: P.AUTO,
           parent: mount.current,
-          width: gameId === "tile-shift" ? 640 : 960,
-          height: gameId === "tile-shift" ? 640 : 540,
+          width: gameId === "tile-shift" ? 400 : 960,
+          height: gameId === "tile-shift" ? 400 : 540,
           scale: { mode: P.Scale.FIT, autoCenter: P.Scale.CENTER_BOTH },
           scene: Arcade,
           render: { antialias: true },
           input: { activePointers: 3 },
+          audio: { noAudio: true },
         });
+        resize = new ResizeObserver(() => game?.scale.refresh());
+        resize.observe(mount.current);
       })
-      .catch(() =>
-        callbacks.current.onError(
-          "This game could not load. Close it and try again.",
-        ),
-      );
+      .catch(() => {
+        if (!disposed)
+          callbacks.current.onError("The game engine could not load.");
+      });
     return () => {
       disposed = true;
+      resize?.disconnect();
       control.current = null;
       game?.destroy(true);
       audio.dispose();

@@ -1,6 +1,9 @@
 import { circleHitsBox, moveTile, isSolved } from "./index";
 export type ArcadeKind =
-  "neon-dash" | "starfall" | "prism-break" | "tile-shift";
+  | "neon-dash"
+  | "starfall"
+  | "prism-break"
+  | "tile-shift";
 export type PuzzleDifficulty = "easy" | "normal" | "hard";
 export type ArcadeInput = {
   x: number;
@@ -18,7 +21,14 @@ export const noArcadeInput = (): ArcadeInput => ({
 });
 export type ArcadeEvent = {
   kind:
-    "hit" | "pickup" | "jump" | "shot" | "clear" | "move" | "boost" | "finish";
+    | "hit"
+    | "pickup"
+    | "jump"
+    | "shot"
+    | "clear"
+    | "move"
+    | "boost"
+    | "finish";
   x: number;
   y: number;
   color: number;
@@ -654,6 +664,11 @@ export class ArcadeSimulation {
         });
       }
   }
+  get prismLaunch() {
+    // Starting further to one side steers the first shot back into the board.
+    const angle = (480 - this.paddle) * 0.00145;
+    return { vx: Math.sin(angle) * 400, vy: -Math.cos(angle) * 400 };
+  }
   private breaker(dt: number, input: ArcadeInput) {
     this.paddle = Math.max(
       this.paddleWidth / 2 + 12,
@@ -681,6 +696,7 @@ export class ArcadeSimulation {
       b.y = 476;
       if (input.action || input.tap) {
         b.active = true;
+        Object.assign(b, this.prismLaunch);
         this.emit("jump", b.x, b.y);
         this.say("Find your angle", 1);
       }
