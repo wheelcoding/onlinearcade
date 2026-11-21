@@ -25,6 +25,13 @@ type Options = {
   maxConnectionsPerIp?: number;
 };
 const CODE = /^[A-F0-9]{6}$/;
+const FEATURES = [
+  "shared-kart-racing",
+  "party-planet",
+  "boostball",
+  "boostball-3d",
+  "boostball-pads",
+];
 export function createArcadeServer(
   origin = "http://localhost:3000",
   options: Options = {},
@@ -47,12 +54,7 @@ export function createArcadeServer(
           status: "ok",
           service: "onlinearcade-multiplayer",
           version: 2,
-          features: [
-            "shared-kart-racing",
-            "party-planet",
-            "boostball",
-            "boostball-3d",
-          ],
+          features: FEATURES,
         }),
       );
     } else {
@@ -481,12 +483,7 @@ export function createArcadeServer(
       if (member && room?.ball && room.ball.id === id)
         room.ball.exit(member.id);
     });
-    socket.emit("capabilities", [
-      "shared-kart-racing",
-      "party-planet",
-      "boostball",
-      "boostball-3d",
-    ]);
+    socket.emit("capabilities", FEATURES);
     presence();
     socket.on("disconnect", () => {
       ips.set(socket.data.ip, Math.max(0, (ips.get(socket.data.ip) || 1) - 1));

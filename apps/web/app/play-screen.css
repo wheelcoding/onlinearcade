@@ -451,22 +451,146 @@
   --play-accent: #89dcff;
 }
 .play-ball .ball-scoreboard {
-  border: 1px solid #fff4;
-  background: #0b1726ee;
+  --score-blue: #9fe6ff;
+  --score-orange: #ffc79f;
+  border: 1px solid #dbefff33;
+  background: #0d1829f2;
+  box-shadow: 0 4px 18px #020b1d66;
   margin: 0;
   min-width: 0;
-  padding: 5px 13px;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
 }
-.play-ball .ball-scoreboard strong {
+.play-ball .ball-scoreboard > strong {
+  align-self: stretch;
+  padding: 7px 14px;
   gap: 8px;
   font-size: 12px;
 }
-.play-ball .ball-scoreboard b {
-  font-size: 23px;
+.play-ball .ball-scoreboard .ball-blue {
+  background: linear-gradient(90deg, #1e577865, #1d416780);
+  color: var(--score-blue);
 }
-.play-ball .ball-scoreboard > span {
-  min-width: 42px;
-  font-size: 15px;
+.play-ball .ball-scoreboard .ball-orange {
+  background: linear-gradient(90deg, #7b472d80, #8a4b3465);
+  color: var(--score-orange);
+}
+.play-ball .ball-scoreboard b {
+  font-size: 26px;
+  line-height: 1;
+}
+.ball-clock {
+  display: grid;
+  min-width: 64px;
+  padding: 4px 9px;
+  text-align: center;
+  gap: 2px;
+}
+.ball-clock strong {
+  display: block;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.ball-clock small {
+  color: #ffdb9b;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ball-kickoff {
+  position: absolute;
+  z-index: 3;
+  top: 28%;
+  left: 50%;
+  display: grid;
+  justify-items: center;
+  min-width: 146px;
+  max-width: calc(100% - 32px);
+  padding: 15px 24px;
+  gap: 2px;
+  transform: translateX(-50%);
+  border: 1px solid #f7e9ba67;
+  border-radius: 18px;
+  background: linear-gradient(125deg, #233a55f2, #0d1928f2);
+  color: #fff2cf;
+  box-shadow: 0 8px 40px #03091388;
+  pointer-events: none;
+}
+.ball-kickoff[data-team="0"] {
+  border-color: #90dfffad;
+  color: #b6ebff;
+}
+.ball-kickoff[data-team="1"] {
+  border-color: #ffbb85ad;
+  color: #ffd6af;
+}
+.ball-kickoff > strong {
+  font-size: 14px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.ball-kickoff > b {
+  font-size: clamp(32px, 6vw, 52px);
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.ball-kickoff > span {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.ball-minimap {
+  position: absolute;
+  z-index: 2;
+  right: var(--play-right);
+  bottom: calc(var(--play-bottom) + 54px);
+  width: clamp(128px, 15vw, 178px);
+  border: 1px solid #ccedf431;
+  border-radius: 13px;
+  background: #0b1726db;
+  pointer-events: none;
+}
+.play-ball .ball-fuel {
+  gap: 12px;
+  padding: 9px 12px;
+}
+.ball-speed {
+  display: grid;
+  align-items: end;
+  min-width: 54px;
+  padding-right: 10px;
+  border-right: 1px solid #ffffff29;
+  text-align: right;
+}
+.ball-speed strong {
+  font-size: 27px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.ball-speed small {
+  color: #adc5d8;
+  font-size: 9px;
+}
+.ball-boost-meter {
+  width: clamp(86px, 11vw, 136px);
+  display: grid;
+  gap: 3px;
+}
+.ball-boost-meter > div {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  color: #dff2ff;
+}
+.ball-boost-meter > div strong {
+  margin-left: auto;
+}
+.play-ball .ball-boost-meter .play-meter {
+  width: 100%;
+  margin: 0;
+}
+.ball-boost-meter > small {
+  color: #a6c5d9;
 }
 
 @media (any-pointer: coarse) {
@@ -550,11 +674,8 @@
   .play-cloud .cloud-hud small {
     font-size: 9px;
   }
-  .play-ball .ball-scoreboard {
+  .play-ball .ball-scoreboard > strong {
     padding: 5px 8px;
-    gap: 7px;
-  }
-  .play-ball .ball-scoreboard strong {
     gap: 4px;
     font-size: 10px;
   }
@@ -660,6 +781,9 @@
   .play-camera-icon {
     bottom: calc(var(--play-bottom) + 58px);
   }
+  .ball-minimap {
+    bottom: calc(var(--play-bottom) + 111px);
+  }
   .play-ball .play-touch-group:last-child,
   .play-race .play-touch-group:last-child {
     max-width: min(290px, 72%);
@@ -679,6 +803,19 @@
   }
   .play-cloud .play-corner {
     bottom: calc(var(--play-bottom) + 106px);
+  }
+}
+@media (max-width: 540px), (max-height: 460px) {
+  .ball-minimap {
+    display: none;
+  }
+}
+@media (max-width: 370px) {
+  .ball-scoreboard > strong span {
+    display: none;
+  }
+  .play-ball .play-touch-group:first-child {
+    max-width: 108px;
   }
 }
 .play-field:focus {

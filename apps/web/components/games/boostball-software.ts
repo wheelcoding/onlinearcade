@@ -20,6 +20,7 @@ export function createBallSoftwareRenderer() {
     uv?: number[];
     line?: boolean;
     sprite?: boolean;
+    radius?: number;
   };
   const faces: Face[] = [];
   const matrix = new T.Matrix4(),
@@ -80,8 +81,9 @@ export function createBallSoftwareRenderer() {
   return {
     domElement: canvas,
     setSize(w: number, h: number) {
-      width = Math.max(1, Math.round(w));
-      height = Math.max(1, Math.round(h));
+      const resolution = Math.min(1, 1280 / Math.max(w, h));
+      width = Math.max(1, Math.round(w * resolution));
+      height = Math.max(1, Math.round(h * resolution));
       canvas.width = width;
       canvas.height = height;
     },
@@ -97,8 +99,9 @@ export function createBallSoftwareRenderer() {
       ctx.fillStyle = "#0b1728";
       ctx.fillRect(0, 0, width, height);
       const sky = ctx.createLinearGradient(0, 0, 0, height);
-      sky.addColorStop(0, "#0b1728");
-      sky.addColorStop(1, "#283f50");
+      sky.addColorStop(0, "#161d35");
+      sky.addColorStop(0.56, "#3e4960");
+      sky.addColorStop(1, "#536464");
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, width, height);
       scene.traverseVisible((object) => {
@@ -136,8 +139,36 @@ export function createBallSoftwareRenderer() {
           });
           return;
         }
-        if (object instanceof T.InstancedMesh || object instanceof T.Points)
+        if (object instanceof T.InstancedMesh) return;
+        if (object instanceof T.Points) {
+          const pos = object.geometry.getAttribute("position");
+          const tint = object.geometry.getAttribute("color");
+          const mat = object.material as T.PointsMaterial;
+          matrix.multiplyMatrices(projection, object.matrixWorld);
+          for (let i = 0; i < pos.count; i++) {
+            if (pos.getY(i) < -1) continue;
+            const p = project(pos.getX(i), pos.getY(i), pos.getZ(i));
+            if (
+              p.z < -1 ||
+              p.z > 1 ||
+              p.x < 0 ||
+              p.x > width ||
+              p.y < 0 ||
+              p.y > height
+            )
+              continue;
+            base.copy(mat.color);
+            if (tint) base.multiply(emissive.fromBufferAttribute(tint, i));
+            faces.push({
+              p: [p],
+              depth: p.z,
+              color: base.getStyle(T.SRGBColorSpace),
+              alpha: mat.opacity,
+              radius: T.MathUtils.clamp((1 - p.z) * height * 1.4, 1, 6),
+            });
+          }
           return;
+        }
         if (object instanceof T.LineSegments) {
           const geo: T.BufferGeometry = object.geometry,
             pos = geo.getAttribute("position");
@@ -162,6 +193,7 @@ export function createBallSoftwareRenderer() {
           pos = geo.getAttribute("position"),
           normals = geo.getAttribute("normal"),
           uvs = geo.getAttribute("uv"),
+          vertexColors = geo.getAttribute("color"),
           indices = geo.index;
         matrix.multiplyMatrices(projection, object.matrixWorld);
         normalMatrix.getNormalMatrix(object.matrixWorld);
@@ -196,7 +228,10 @@ export function createBallSoftwareRenderer() {
             (p[1].y - p[0].y) * (p[2].x - p[0].x);
           if (mat.side !== T.DoubleSide && area >= 0) continue;
           const colored = mat as T.MeshStandardMaterial;
-          base.copy(colored.color ?? new T.Color(0xffffff));
+          if (colored.color) base.copy(colored.color);
+          else base.setHex(0xffffff);
+          if (colored.vertexColors && vertexColors)
+            base.multiply(emissive.fromBufferAttribute(vertexColors, ids[0]));
           let intensity = 1;
           if (normals && !(mat instanceof T.MeshBasicMaterial)) {
             normal
@@ -248,6 +283,12 @@ export function createBallSoftwareRenderer() {
           continue;
         }
         ctx.beginPath();
+        if (face.radius) {
+          ctx.arc(face.p[0].x, face.p[0].y, face.radius, 0, Math.PI * 2);
+          ctx.fillStyle = face.color;
+          ctx.fill();
+          continue;
+        }
         ctx.moveTo(face.p[0].x, face.p[0].y);
         for (let i = 1; i < face.p.length; i++)
           ctx.lineTo(face.p[i].x, face.p[i].y);

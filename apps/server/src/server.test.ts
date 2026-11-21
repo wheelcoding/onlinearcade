@@ -454,7 +454,9 @@ test("Boostball launches one shared match, isolates room snapshots and accepts o
     other.emit("ball:sync", started.id);
     const received = event<any>(b, "ball:state");
     b.emit("ball:sync", started.id);
-    assert.equal((await received).cars.length, 2);
+    const kickoff = await received;
+    assert.equal(kickoff.cars.length, 2);
+    assert.deepEqual(kickoff.pads, [0, 0, 0, 0, 0, 0]);
     const packets: any[] = [];
     a.on("ball:state", (p) => packets.push(p));
     const controls = setInterval(

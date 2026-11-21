@@ -19,12 +19,12 @@ export const games: GameDefinition[] = [
     type: "3D · TEAM SPORT",
     art: "boostball",
     tag: "3D CAR SOCCER",
-    desc: "Jump. Boost. Score. A full 3D stadium. Real aerial challenges.",
+    desc: "Powerslide into shots. Boost through the air. Score with friends.",
     playable: true,
     controls:
-      "WASD / arrows drive · Shift boost · Space jump · X dodge · C camera · Touch controls",
+      "WASD / arrows drive · Z powerslide · Shift boost · Space jump · X directional dodge · C camera · Touch controls",
     objective:
-      "Score more goals in three minutes. Play with 2–8 friends or practice against AI.",
+      "Score more goals in three minutes or win in sudden-death overtime. Play in a party, against AI or in untimed free play.",
   },
   {
     id: "neon-dash",

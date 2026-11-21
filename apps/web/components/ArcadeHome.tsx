@@ -269,18 +269,7 @@ function ArcadeContent() {
               return (
                 <article className="game-card arcade-card" key={game.id}>
                   <div className={`thumbnail ${game.art}`}>
-                    {game.id === "boostball" ? (
-                      <img
-                        className="game-artwork"
-                        src={`${basePath}/art/boostball-cover.webp`}
-                        width={640}
-                        height={426}
-                        loading="lazy"
-                        alt="Blue and orange cars in Boostball's stadium"
-                      />
-                    ) : (
-                      <GameArtwork game={game} />
-                    )}
+                    <GameArtwork game={game} />
                     <span className="game-type">{game.type}</span>
                   </div>
                   <div className="game-info">

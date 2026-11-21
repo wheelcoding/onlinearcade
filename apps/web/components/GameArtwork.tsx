@@ -19,7 +19,9 @@ export default function GameArtwork({ game }: { game: GameDefinition }) {
                   ? "#213d51"
                   : kind === "cloud"
                     ? "#5d9fa9"
-                    : "#181537"
+                    : kind === "boostball"
+                      ? "#465171"
+                      : "#181537"
             }
           />
           <stop
@@ -57,116 +59,70 @@ export default function GameArtwork({ game }: { game: GameDefinition }) {
         />
       ))}
       {kind === "boostball" ? (
-        <g>
-          <rect
-            x="32"
-            y="55"
-            width="576"
-            height="285"
-            rx="30"
-            fill="#183744"
-            stroke="#66c9dc"
-            strokeWidth="3"
-          />
-          {Array.from({ length: 10 }, (_, i) => (
-            <rect
-              key={i}
-              x={40 + i * 56}
-              y="65"
-              width="28"
-              height="265"
-              fill="#72bab6"
-              opacity=".07"
-            />
-          ))}
+        <>
+          <circle cx="482" cy="105" r="65" fill="#f4ba99" />
           <path
-            d="M320 58V338 M35 145H140V250H35 M605 145H500V250H605"
+            d="M0 171 135 110 320 173 550 115 640 161V400H0Z"
+            fill="#3b375b"
+          />
+          <path
+            d="M0 194 122 156 294 200 570 155 640 181V400H0Z"
+            fill="#262c49"
+          />
+          <path d="M0 212H640V400H0Z" fill="#233e49" />
+          <path
+            d="M0 212H640M82 212 0 361M551 212 640 378M0 350H640"
             fill="none"
-            stroke="#b4e1d4"
-            opacity=".4"
+            stroke="#90bab7"
+            opacity=".48"
             strokeWidth="3"
           />
-          <circle
-            cx="320"
-            cy="200"
-            r="65"
-            fill="none"
-            stroke="#b4e1d4"
-            strokeWidth="3"
-            opacity=".4"
-          />
-          <path
-            d="M35 145H12V250H35"
-            fill="#63d5ff33"
-            stroke="#63d5ff"
-            strokeWidth="6"
-          />
-          <path
-            d="M605 145H628V250H605"
-            fill="#ffa15933"
-            stroke="#ffa159"
-            strokeWidth="6"
-          />
-          <g transform="translate(225 245) rotate(-24)">
-            <path d="M-30 -12L-110 0L-30 12" fill="#63d5ff" opacity=".5" />
-            <rect
-              x="-35"
-              y="-22"
-              width="70"
-              height="44"
-              rx="12"
-              fill="#63d5ff"
-            />
-            <rect
-              x="-10"
-              y="-16"
-              width="25"
-              height="32"
-              rx="5"
-              fill="#173550"
-            />
-            <path d="M24 -15V-5 M24 5V15" stroke="#fff5d2" strokeWidth="5" />
-          </g>
-          <g transform="translate(455 140) rotate(150)">
-            <path d="M-30 -12L-100 0L-30 12" fill="#ffa159" opacity=".5" />
-            <rect
-              x="-35"
-              y="-22"
-              width="70"
-              height="44"
-              rx="12"
-              fill="#ffa159"
-            />
-            <rect
-              x="-10"
-              y="-16"
-              width="25"
-              height="32"
-              rx="5"
-              fill="#51382e"
-            />
-          </g>
-          <circle
+          <ellipse
             cx="337"
-            cy="192"
-            r="29"
-            fill="#eff9e6"
-            stroke="#9eb7bb"
+            cy="282"
+            rx="109"
+            ry="42"
+            fill="none"
+            stroke="#90bab7"
             strokeWidth="3"
+            opacity=".64"
           />
-          <path d="M337 180L348 188L344 201H330L326 188Z" fill="#264958" />
-          <text
-            x="320"
-            y="380"
-            fill="#cde8e7"
-            textAnchor="middle"
-            fontSize="17"
-            fontWeight="800"
-            letterSpacing="7"
-          >
-            OWN THE ARENA
-          </text>
-        </g>
+          <path
+            d="M440 213V142H559L581 214Z"
+            fill="#38374f"
+            stroke="#f2b994"
+            strokeWidth="5"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M452 164H565M451 187H571M467 146V212M494 146V212M521 146 528 212M541 146 552 212"
+            fill="none"
+            stroke="#f2b994"
+            strokeWidth="2"
+            opacity=".4"
+          />
+          <path
+            d="M119 271Q197 147 306 195"
+            fill="none"
+            stroke="#c3e2d5"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray="5 13"
+            opacity=".72"
+          />
+          <g transform="translate(337 192)">
+            <circle r="46" fill="#f6e8c7" />
+            <path d="m0-15 19 14-8 22h-23l-8-22Z" fill="#60768b" />
+            <path
+              d="M0-15v-31M19-1l25-8M11 21l18 15M-12 21l-15 16M-20-1l-24-9"
+              fill="none"
+              stroke="#60768b"
+              strokeWidth="3"
+            />
+          </g>
+          <BoostballArtCar x={206} y={282} angle={-24} color="#a6dfdb" />
+          <BoostballArtCar x={469} y={287} angle={196} color="#ffc18b" />
+        </>
       ) : kind === "racing" ? (
         <>
           <circle cx="440" cy="115" r="77" fill="#ffd5a1" />
@@ -470,5 +426,39 @@ export default function GameArtwork({ game }: { game: GameDefinition }) {
         strokeWidth="3"
       />
     </svg>
+  );
+}
+
+function BoostballArtCar({
+  x,
+  y,
+  angle,
+  color,
+}: {
+  x: number;
+  y: number;
+  angle: number;
+  color: string;
+}) {
+  return (
+    <g transform={`translate(${x} ${y}) rotate(${angle})`}>
+      <path d="M-42-13-132 0l90 13Z" fill={color} opacity=".48" />
+      <rect x="-40" y="-36" width="26" height="72" rx="9" fill="#191e32" />
+      <rect x="16" y="-36" width="26" height="72" rx="9" fill="#191e32" />
+      <path d="M-49-25H29L53-16V16L29 25H-49Z" fill={color} />
+      <path d="M-14-17H13l10 8v18l-10 8h-27Z" fill="#344c62" />
+      <path
+        d="M-43-28v56"
+        stroke="#e8e3d2"
+        strokeWidth="7"
+        strokeLinecap="round"
+      />
+      <path
+        d="M42-12v5m0 14v5"
+        stroke="#fff3d2"
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+    </g>
   );
 }

@@ -22,6 +22,7 @@ test("ball controls reject spoofed ownership, invalid sessions, nonfinite values
     { ...cmd, input: { ...cmd.input, steer: Infinity } },
     { ...cmd, input: { ...cmd.input, boost: "true" } },
     { ...cmd, input: { ...cmd.input, jump: "true" } },
+    { ...cmd, input: { ...cmd.input, drift: "true" } },
   ])
     assert.equal(game.command("a", raw, 1000), false);
   assert.equal(game.command("outsider", cmd, 1000), false);
@@ -42,6 +43,27 @@ test("ball controls reject spoofed ownership, invalid sessions, nonfinite values
   assert.ok(game.sim.state.cars[0].fuel > fuel2);
   game.exit("a");
   assert.equal(game.command("a", { ...cmd, seq: 3 }, 1700), false);
+});
+
+test("powerslide is accepted as a control and boost pads come from the server", () => {
+  const game = new OnlineBall("match", roster);
+  game.sim.state.countdown = 0;
+  const car = game.sim.state.cars[0];
+  car.vx = 250;
+  assert.ok(
+    game.command(
+      "a",
+      {
+        ...cmd,
+        pads: [999],
+        input: { ...cmd.input, steer: 0.6, drift: true },
+      },
+      1000,
+    ),
+  );
+  game.advance(0.1, new Set(["a"]), 1050);
+  assert.ok(game.packet().cars[0].drifting);
+  assert.deepEqual(game.packet().pads, [0, 0, 0, 0, 0, 0]);
 });
 
 test("server owns jump height and rejects client-supplied altitude", () => {

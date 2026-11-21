@@ -48,6 +48,8 @@ export function createArcadeAudio() {
       }
       if (kind === "jump") tone(260, 0.14, 0.05, "triangle", 540);
       if (kind === "hit") tone(120, 0.11, 0.05, "triangle", 55);
+      if (kind === "ball-contact") tone(165, 0.12, 0.045, "triangle", 63);
+      if (kind === "kickoff") tone(560, 0.16, 0.045, "sine", 850);
       if (kind === "pickup") tone(720, 0.12, 0.035, "sine", 1100);
       if (kind === "move") tone(410, 0.055, 0.035, "sine", 520);
       if (kind === "boost") tone(220, 0.28, 0.06, "triangle", 880);

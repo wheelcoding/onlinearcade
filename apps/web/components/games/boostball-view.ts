@@ -1,6 +1,6 @@
 import * as T from "three";
 import { createBallSoftwareRenderer } from "./boostball-software";
-import type { BallState } from "@onlinearcade/core";
+import { BOOSTBALL_PADS, type BallState } from "@onlinearcade/core";
 export type BallCamera = "chase" | "ball" | "stadium";
 export type BallView = {
   draw: (state: BallState, dt: number, mode: BallCamera) => void;
@@ -46,8 +46,8 @@ export function createBoostballView(
   };
   renderer.domElement.addEventListener("webglcontextlost", lost);
   const scene = new T.Scene();
-  scene.background = new T.Color(0x09111e);
-  scene.fog = new T.Fog(0x09111e, 80, 180);
+  scene.background = new T.Color(0x191b35);
+  scene.fog = new T.Fog(0x191b35, 88, 190);
   const camera = new T.PerspectiveCamera(62, 1, 0.1, 240);
   camera.position.set(-43, 15, 16);
   const look = new T.Vector3(0, 1, 0);
@@ -55,6 +55,10 @@ export function createBoostballView(
   let firstFrame = true,
     time = 0,
     lastScore = 0,
+    lastTouch = 0,
+    previousCountdown = 0,
+    previousMode: BallCamera = "chase",
+    needsDraw = true,
     goalFlash = 0;
   const geometries = new Set<T.BufferGeometry>(),
     materials = new Set<T.Material>(),
@@ -102,12 +106,11 @@ export function createBoostballView(
   ) => mesh(new T.BoxGeometry(w, h, d), mat, parent, x, y, z);
   const dark = standard(0x111d2b, 0.65, 0.55),
     steel = standard(0x36495b, 0.4, 0.7),
-    white = standard(0xd5f3ea, 0.6),
     blue = glow(BLUE),
     orange = glow(ORANGE),
     glass = standard(0x152c40, 0.14, 0.8);
-  scene.add(new T.HemisphereLight(0xc0e6ff, 0x283024, 2));
-  const sun = new T.DirectionalLight(0xffebd8, 3.2);
+  scene.add(new T.HemisphereLight(0xccd9ff, 0x51745d, 1.85));
+  const sun = new T.DirectionalLight(0xffead1, 2.7);
   sun.position.set(-20, 42, 20);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -129,22 +132,22 @@ export function createBoostballView(
   turfCanvas.width = 2048;
   turfCanvas.height = 1024;
   const ctx = turfCanvas.getContext("2d")!;
-  ctx.fillStyle = "#183f3d";
+  ctx.fillStyle = "#244953";
   ctx.fillRect(0, 0, 2048, 1024);
   for (let i = 0; i < 16; i++) {
-    ctx.fillStyle = i % 2 ? "#214c46" : "#1b443f";
+    ctx.fillStyle = i % 2 ? "#2b5659" : "#264c52";
     ctx.fillRect(i * 128, 0, 128, 1024);
   }
   let seed = 41;
   for (let i = 0; i < 22000; i++) {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    const x = seed % 2048;
+    const x = (seed >>> 13) % 2048;
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    const y = seed % 1024;
-    ctx.fillStyle = i % 2 ? "#c8e3a90b" : "#051c220f";
+    const y = (seed >>> 13) % 1024;
+    ctx.fillStyle = i % 2 ? "#d0ffca12" : "#071c341b";
     ctx.fillRect(x, y, 1, 3);
   }
-  ctx.strokeStyle = "#b6ded1";
+  ctx.strokeStyle = "#c0e1da";
   ctx.lineWidth = 4;
   ctx.globalAlpha = 0.7;
   ctx.strokeRect(14, 14, 2020, 996);
@@ -153,20 +156,30 @@ export function createBoostballView(
   ctx.lineTo(1024, 1010);
   ctx.stroke();
   ctx.beginPath();
-  ctx.ellipse(1024, 512, 184, 184, 0, 0, Math.PI * 2);
+  ctx.arc(1024, 512, 184, 0, Math.PI * 2);
+  ctx.fillStyle = "#1b394d";
+  ctx.fill();
   ctx.stroke();
+  ctx.fillStyle = "#d1ede2";
+  ctx.beginPath();
+  ctx.moveTo(1068, 410);
+  ctx.lineTo(949, 534);
+  ctx.lineTo(1014, 534);
+  ctx.lineTo(983, 623);
+  ctx.lineTo(1100, 490);
+  ctx.lineTo(1038, 490);
+  ctx.closePath();
+  ctx.fill();
   for (const right of [false, true]) {
     const x = right ? 1726 : 14;
+    ctx.fillStyle = right ? "#f8a3642e" : "#68d8f832";
+    ctx.fillRect(x, 282, 308, 460);
     ctx.strokeRect(x, 282, 308, 460);
     ctx.beginPath();
     ctx.arc(right ? 1810 : 238, 512, 75, 0, Math.PI * 2);
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
-  ctx.fillStyle = "#d5f0dd";
-  ctx.beginPath();
-  ctx.arc(1024, 512, 7, 0, Math.PI * 2);
-  ctx.fill();
   const turf = new T.CanvasTexture(turfCanvas);
   turf.colorSpace = T.SRGBColorSpace;
   turf.anisotropy = Math.min(
@@ -191,39 +204,45 @@ export function createBoostballView(
     depthWrite: false,
   });
   materials.add(boardMat);
-  for (const z of [-SIDE_WALL_Z, SIDE_WALL_Z]) {
+  for (const side of [-1, 1]) {
+    const z = side * SIDE_WALL_Z;
     box(75, 14, 0.18, boardMat, scene, 0, 7, z);
-    box(75, 0.12, 0.18, glow(0x65a3be, 0.8), scene, 0, 0.12, z);
-    box(75, 0.1, 0.14, steel, scene, 0, 2.6, z);
+    box(75, 0.58, 0.24, dark, scene, 0, 0.28, z);
+    box(37.4, 0.1, 0.28, blue, scene, -18.7, 0.59, z);
+    box(37.4, 0.1, 0.28, orange, scene, 18.7, 0.59, z);
+    box(75, 0.1, 0.14, steel, scene, 0, 3.2, z);
+    for (let x = -36; x <= 36; x += 9)
+      box(0.13, 3.2, 0.16, steel, scene, x, 1.6, z);
   }
   for (const sign of [-1, 1]) {
     const x = sign * END_WALL_X,
       team = sign > 0 ? orange : blue;
     for (const z of [-12.5, 12.5]) {
       box(0.18, 14, 15, boardMat, scene, x, 7, z);
-      box(0.16, 0.16, 15, team, scene, x, 0.13, z);
+      box(0.28, 0.65, 15, dark, scene, x, 0.32, z);
+      box(0.31, 0.15, 15, team, scene, x, 0.69, z);
     }
     box(0.18, 6.5, 10.5, boardMat, scene, x, 10.75, 0);
     // Recessed net, glowing posts, crossbar and goal sensor apron.
     for (const z of [-5.25, 5.25]) {
-      box(0.28, 7.5, 0.28, team, scene, x, 3.75, z);
-      box(3.4, 0.2, 0.2, steel, scene, x + sign * 1.6, 7.45, z);
+      box(0.41, 7.5, 0.38, team, scene, x, 3.75, z);
+      box(3.4, 0.17, 0.22, steel, scene, x + sign * 1.6, 7.45, z);
     }
     box(0.28, 0.28, 10.75, team, scene, x, 7.5, 0);
     box(0.2, 0.2, 10.75, steel, scene, x + sign * 3.4, 7.45, 0);
     const net = new T.LineBasicMaterial({
       color: sign > 0 ? 0xe6b697 : 0x87c9e2,
       transparent: true,
-      opacity: 0.32,
+      opacity: 0.62,
     });
     materials.add(net);
     const vertices: number[] = [];
     const back = x + sign * 3.4;
-    for (let y = 0.2; y <= 7.5; y += 0.55) {
+    for (let y = 0.2; y <= 7.5; y += 0.48) {
       vertices.push(back, y, -5.25, back, y, 5.25);
       for (const z of [-5.25, 5.25]) vertices.push(x, y, z, back, y, z);
     }
-    for (let z = -5.25; z <= 5.25; z += 0.55)
+    for (let z = -5.25; z <= 5.25; z += 0.48)
       vertices.push(back, 0, z, back, 7.5, z, x, 7.5, z, back, 7.5, z);
     const geo = new T.BufferGeometry();
     geo.setAttribute("position", new T.Float32BufferAttribute(vertices, 3));
@@ -284,7 +303,17 @@ export function createBoostballView(
       box(0.4, 17, 0.4, steel, scene, x, 8, side * 34);
       const rib = box(0.25, 0.25, 18, steel, scene, x, 16, side * 28);
       rib.rotation.x = side * 0.13;
-      box(5, 0.22, 1, glow(0xe4f1ff, 2.5), scene, x, 16, side * 21);
+      box(5.4, 0.4, 1.25, dark, scene, x, 16.2, side * 21);
+      box(
+        5,
+        0.17,
+        1,
+        glow(side > 0 ? 0xffdfa3 : 0xc6e8ff, 2.1),
+        scene,
+        x,
+        15.95,
+        side * 21,
+      );
     }
     box(
       88,
@@ -331,17 +360,24 @@ export function createBoostballView(
     -95,
   );
   moon.castShadow = false;
-  // Illuminated perimeter screens: original stadium identity, no outside branding.
+  // Branded rink boards and paired live score displays above the goals.
   const signCanvas = document.createElement("canvas");
   signCanvas.width = 1024;
   signCanvas.height = 128;
   const sc = signCanvas.getContext("2d")!;
-  sc.fillStyle = "#0c1b2c";
+  const ribbon = sc.createLinearGradient(0, 0, 1024, 100);
+  ribbon.addColorStop(0, "#28526a");
+  ribbon.addColorStop(0.54, "#17283e");
+  ribbon.addColorStop(1, "#744855");
+  sc.fillStyle = ribbon;
   sc.fillRect(0, 0, 1024, 128);
-  sc.fillStyle = "#c7f2ed";
-  sc.font = "bold 50px sans-serif";
+  sc.fillStyle = "#e1c9a8";
+  sc.fillRect(0, 0, 1024, 4);
+  sc.fillRect(0, 124, 1024, 4);
+  sc.fillStyle = "#edebd7";
+  sc.font = "900 58px sans-serif";
   sc.textAlign = "center";
-  sc.fillText("B O O S T B A L L   /   NIGHT LEAGUE", 512, 82);
+  sc.fillText("B O O S T B A L L", 512, 84);
   const signTexture = new T.CanvasTexture(signCanvas);
   signTexture.colorSpace = T.SRGBColorSpace;
   textures.add(signTexture);
@@ -351,41 +387,108 @@ export function createBoostballView(
   });
   materials.add(signMat);
   for (const z of [-22, 22]) {
-    const sign = mesh(new T.PlaneGeometry(35, 4.4), signMat, scene, 0, 3, z);
+    const sign = mesh(new T.PlaneGeometry(45, 3.6), signMat, scene, 0, 3.36, z);
+    sign.castShadow = false;
     if (z > 0) sign.rotation.y = Math.PI;
   }
-  // Boost recharge indicators, animated rings with no false pickup mechanics.
-  const pads: T.Mesh[] = [];
-  for (const x of [-25, 0, 25])
-    for (const z of [-14, 14]) {
-      const ring = mesh(
-        new T.TorusGeometry(0.8, 0.07, 6, 24),
-        glow(0xf7c566, 1.2),
-        scene,
-        x,
-        0.08,
-        z,
-      );
-      ring.rotation.x = Math.PI / 2;
-      pads.push(ring);
+  const scoreCanvas = document.createElement("canvas");
+  scoreCanvas.width = 640;
+  scoreCanvas.height = 160;
+  const scoreCtx = scoreCanvas.getContext("2d")!;
+  const scoreTexture = new T.CanvasTexture(scoreCanvas);
+  scoreTexture.colorSpace = T.SRGBColorSpace;
+  textures.add(scoreTexture);
+  const scoreMat = new T.MeshBasicMaterial({ map: scoreTexture });
+  materials.add(scoreMat);
+  let boardText = "";
+  const paintScore = (state: BallState) => {
+    const value = `${state.score[0]}:${state.score[1]}:${!!state.overtime}`;
+    if (value === boardText) return;
+    boardText = value;
+    scoreCtx.fillStyle = "#182539";
+    scoreCtx.fillRect(0, 0, 640, 160);
+    scoreCtx.fillStyle = "#285975";
+    scoreCtx.fillRect(5, 5, 145, 150);
+    scoreCtx.fillStyle = "#834b45";
+    scoreCtx.fillRect(490, 5, 145, 150);
+    scoreCtx.fillStyle = "#fff1ce";
+    scoreCtx.font = "900 88px sans-serif";
+    scoreCtx.textAlign = "center";
+    scoreCtx.fillText(String(state.score[0]), 78, 115);
+    scoreCtx.fillText(String(state.score[1]), 562, 115);
+    scoreCtx.font = "900 35px sans-serif";
+    scoreCtx.fillText(state.overtime ? "OVERTIME" : "BOOSTBALL", 320, 96);
+    scoreTexture.needsUpdate = true;
+  };
+  for (const side of [-1, 1]) {
+    const team = side > 0 ? orange : blue;
+    const x = side * 43;
+    box(0.66, 4.2, 16.7, dark, scene, x, 11.4, 0);
+    box(0.9, 0.13, 16.9, team, scene, x, 13.5, 0);
+    box(0.9, 0.13, 16.9, team, scene, x, 9.3, 0);
+    for (const z of [-12, 12]) {
+      box(0.5, 15, 0.7, steel, scene, x, 7.5, z);
+      box(0.22, 10, 0.44, team, scene, x - side * 0.45, 6.6, z);
     }
+    const panel = mesh(
+      new T.PlaneGeometry(16, 4),
+      scoreMat,
+      scene,
+      x - side * 0.36,
+      11.4,
+      0,
+    );
+    panel.rotation.y = (side * -Math.PI) / 2;
+    panel.castShadow = false;
+  }
+  const padReady = glow(0xffda80, 1.45);
+  const padSpent = standard(0x667767, 0.42, 0.7);
+  const padRing = new T.TorusGeometry(1.3, 0.075, 6, 24);
+  const padCore = new T.OctahedronGeometry(0.4);
+  const padBase = new T.CylinderGeometry(1.1, 1.23, 0.11, 12);
+  const pads = BOOSTBALL_PADS.map((point) => {
+    const p = scale(point.x, point.y);
+    const base = mesh(padBase, dark, scene, p.x, 0.05, p.z);
+    const ring = mesh(padRing, padReady, scene, p.x, 0.11, p.z);
+    ring.rotation.x = Math.PI / 2;
+    const token = mesh(padCore, padReady, scene, p.x, 0.73, p.z);
+    base.castShadow = ring.castShadow = token.castShadow = false;
+    return { base, ring, token };
+  });
   const ballGroup = new T.Group();
   scene.add(ballGroup);
   const ballGeo = new T.IcosahedronGeometry(1.416, 2),
-    ballMaterial = standard(0xf1f6de, 0.27, 0.35);
+    ballMaterial = standard(0xffffff, 0.36, 0.18);
+  const vertices = ballGeo.getAttribute("position");
+  const panels = new T.IcosahedronGeometry(1, 0);
+  const tips = panels.getAttribute("position");
+  const directions = Array.from({ length: tips.count }, (_, index) =>
+    new T.Vector3().fromBufferAttribute(tips, index),
+  );
+  panels.dispose();
+  const centroid = new T.Vector3(),
+    corner = new T.Vector3();
+  const ballColors = new Float32Array(vertices.count * 3);
+  const panelColors = [
+    new T.Color(0x162943),
+    new T.Color(0xf3ebd4),
+    new T.Color(0x97dce9),
+  ];
+  for (let i = 0; i < vertices.count; i += 3) {
+    centroid
+      .fromBufferAttribute(vertices, i)
+      .add(corner.fromBufferAttribute(vertices, i + 1))
+      .add(corner.fromBufferAttribute(vertices, i + 2))
+      .normalize();
+    const dot = Math.max(
+      ...directions.map((direction) => centroid.dot(direction)),
+    );
+    const color = panelColors[dot > 0.978 ? 0 : dot > 0.944 ? 2 : 1];
+    for (let j = i; j < i + 3; j++) color.toArray(ballColors, j * 3);
+  }
+  ballGeo.setAttribute("color", new T.BufferAttribute(ballColors, 3));
+  ballMaterial.vertexColors = true;
   mesh(ballGeo, ballMaterial, ballGroup);
-  const seams = mesh(
-    new T.IcosahedronGeometry(1.43, 0),
-    new T.MeshBasicMaterial({ color: 0x143b50, wireframe: true }),
-    ballGroup,
-  );
-  materials.add(seams.material as T.Material);
-  const core = mesh(
-    new T.SphereGeometry(0.5, 12, 8),
-    glow(0x8df2ff, 1.5),
-    ballGroup,
-  );
-  core.visible = false;
   const ballShadowMat = new T.MeshBasicMaterial({
     color: 0x000d15,
     transparent: true,
@@ -412,6 +515,11 @@ export function createBoostballView(
     0,
   );
   marker.rotation.x = Math.PI / 2;
+  const carShadowGeo = new T.CircleGeometry(1.56, 20);
+  const nose = glow(0xffeed0, 1.5);
+  const brakeLights = glow(0xff5863, 1.3);
+  const rubber = standard(0x111724, 0.92);
+  const rim = standard(0xb7c6ce, 0.24, 0.7);
   type CarModel = {
     root: T.Group;
     body: T.Group;
@@ -419,10 +527,12 @@ export function createBoostballView(
     flames: T.Mesh[];
     tag: T.Sprite;
     ring: T.Mesh;
+    shadow: T.Mesh;
     pose: T.Vector3;
     angle: number;
     lastDodge: number;
     flip: number;
+    lastFuel: number;
   };
   const cars = new Map<string, CarModel>();
   const roundedBody = (w: number, d: number, h: number) => {
@@ -453,24 +563,36 @@ export function createBoostballView(
       body = new T.Group();
     root.add(body);
     scene.add(root);
-    const paint = standard(team ? ORANGE : BLUE, 0.28, 0.55),
-      trim = glow(team ? ORANGE : BLUE, 1.1),
-      tire = standard(0x080d14, 0.92),
-      rim = standard(0x9cabb8, 0.3, 0.85);
-    mesh(roundedBody(3.5, 1.8, 0.55), paint, body, 0, 0.5, 0);
-    box(3.25, 0.2, 1.85, dark, body, 0, 0.45, 0);
-    const cabin = box(1.55, 0.65, 1.47, glass, body, -0.25, 1.35, 0);
-    cabin.rotation.z = -0.06;
-    box(1.7, 0.12, 1.5, paint, body, -0.3, 1.75, 0);
-    box(1.4, 0.08, 0.18, white, body, 0.9, 1.12, 0);
+    const paint = standard(team ? 0xfa8f62 : 0x449fe2, 0.26, 0.38),
+      accent = standard(team ? 0xf8c488 : 0xb2e6ef, 0.32, 0.25),
+      trim = team ? orange : blue;
+    mesh(roundedBody(3.55, 1.94, 0.48), paint, body, 0, 0.43, 0);
+    box(3.4, 0.22, 2.02, dark, body, 0, 0.42, 0);
+    const cabin = mesh(
+      roundedBody(1.55, 1.43, 0.55),
+      glass,
+      body,
+      -0.26,
+      0.9,
+      0,
+    );
+    cabin.rotation.z = -0.1;
+    box(1.15, 0.12, 1.3, paint, body, -0.41, 1.5, 0);
+    box(3.28, 0.068, 0.35, accent, body, 0, 0.927, 0);
+    box(1.05, 0.075, 0.35, accent, body, -0.41, 1.6, 0);
+    box(0.31, 0.27, 1.95, dark, body, 1.65, 0.46, 0);
+    box(0.18, 0.12, 0.82, steel, body, 1.83, 0.51, 0);
     for (const z of [-0.65, 0.65]) {
-      box(0.12, 0.1, 0.42, glow(0xf6f8cf, 2), body, 1.77, 0.9, z);
-      box(0.12, 0.12, 0.4, glow(0xff3e58, 1.3), body, -1.77, 0.87, z);
+      box(0.12, 0.13, 0.48, nose, body, 1.77, 0.777, z);
+      box(0.12, 0.11, 0.48, brakeLights, body, -1.79, 0.74, z);
       box(0.1, 0.6, 0.1, dark, body, -1.35, 1.35, z);
     }
-    box(0.38, 0.12, 2.05, paint, body, -1.4, 1.7, 0);
-    box(2.4, 0.035, 0.11, trim, body, 0, 0.52, 0.94);
-    box(2.4, 0.035, 0.11, trim, body, 0, 0.52, -0.94);
+    box(0.44, 0.11, 2.15, accent, body, -1.42, 1.67, 0);
+    for (const side of [-1, 1]) {
+      box(2.46, 0.09, 0.13, trim, body, 0, 0.52, side * 0.98);
+      const panel = box(1.2, 0.19, 0.07, accent, body, -0.42, 0.77, side);
+      panel.rotation.z = -0.18;
+    }
     const wheels: T.Group[] = [];
     for (const x of [-1.05, 1.05])
       for (const z of [-1, 1]) {
@@ -478,17 +600,23 @@ export function createBoostballView(
         pivot.position.set(x, 0.47, z);
         body.add(pivot);
         const wheel = mesh(
-          new T.CylinderGeometry(0.43, 0.43, 0.3, 14),
-          tire,
+          new T.CylinderGeometry(0.46, 0.46, 0.34, 14),
+          rubber,
           pivot,
         );
         wheel.rotation.x = Math.PI / 2;
         const hub = mesh(
-          new T.CylinderGeometry(0.23, 0.23, 0.32, 8),
+          new T.CylinderGeometry(0.27, 0.27, 0.36, 8),
           rim,
           pivot,
         );
         hub.rotation.x = Math.PI / 2;
+        const inner = mesh(
+          new T.CylinderGeometry(0.11, 0.11, 0.38, 6),
+          trim,
+          pivot,
+        );
+        inner.rotation.x = Math.PI / 2;
         wheels.push(pivot);
       }
     const flames: T.Mesh[] = [];
@@ -517,12 +645,14 @@ export function createBoostballView(
     canvas.width = 512;
     canvas.height = 80;
     const c = canvas.getContext("2d")!;
-    c.fillStyle = "#071220cc";
-    c.fillRect(0, 0, 512, 80);
+    c.fillStyle = "#0a1426d9";
+    c.beginPath();
+    c.roundRect(18, 5, 476, 70, 28);
+    c.fill();
     c.fillStyle = team ? "#ffc99b" : "#98e4ff";
-    c.font = "bold 28px sans-serif";
+    c.font = "bold 35px sans-serif";
     c.textAlign = "center";
-    c.fillText(name.slice(0, 24) + (id === mine ? " · YOU" : ""), 256, 51);
+    c.fillText(id === mine ? "YOU" : name.slice(0, 24), 256, 52, 428);
     const texture = new T.CanvasTexture(canvas);
     texture.colorSpace = T.SRGBColorSpace;
     textures.add(texture);
@@ -533,7 +663,7 @@ export function createBoostballView(
     });
     materials.add(tagMat);
     const tag = new T.Sprite(tagMat);
-    tag.scale.set(5.8, 0.9, 1);
+    tag.scale.set(4.15, 0.65, 1);
     root.add(tag);
     tag.position.y = 3.2;
     const ring = mesh(
@@ -543,6 +673,10 @@ export function createBoostballView(
     );
     ring.rotation.x = Math.PI / 2;
     ring.visible = id === mine;
+    ring.castShadow = false;
+    const shadow = mesh(carShadowGeo, ballShadowMat, scene);
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.castShadow = false;
     const car = {
       root,
       body,
@@ -550,10 +684,12 @@ export function createBoostballView(
       flames,
       tag,
       ring,
+      shadow,
       pose: new T.Vector3(),
       angle: 0,
       lastDodge: 0,
       flip: 0,
+      lastFuel: 100,
     };
     cars.set(id, car);
     return car;
@@ -577,25 +713,33 @@ export function createBoostballView(
   });
   materials.add(particleMat);
   const particles = new T.Points(particleGeo, particleMat);
+  particles.frustumCulled = false;
   scene.add(particles);
   let cursor = 0;
+  const effectColor = new T.Color();
   const emit = (p: T.Vector3, color: number, count: number, power: number) => {
-    const c = new T.Color(color);
+    effectColor.setHex(color);
     for (let j = 0; j < count; j++) {
       const i = cursor++ % life.length;
       life[i] = 1;
-      positions.set([p.x, p.y, p.z], i * 3);
-      colors.set([c.r, c.g, c.b], i * 3);
-      velocity.set(
-        [
-          (Math.random() - 0.5) * power,
-          Math.random() * power * 0.6,
-          (Math.random() - 0.5) * power,
-        ],
-        i * 3,
-      );
+      const offset = i * 3;
+      p.toArray(positions, offset);
+      effectColor.toArray(colors, offset);
+      velocity[offset] = (Math.random() - 0.5) * power;
+      velocity[offset + 1] = Math.random() * power * 0.6;
+      velocity[offset + 2] = (Math.random() - 0.5) * power;
     }
   };
+  const shockMat = new T.MeshBasicMaterial({
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: T.DoubleSide,
+  });
+  materials.add(shockMat);
+  const shock = mesh(new T.RingGeometry(0.82, 1, 40), shockMat, scene);
+  shock.rotation.y = Math.PI / 2;
+  shock.castShadow = false;
   const resize = () => {
     const w = Math.max(1, target.clientWidth),
       h = Math.max(1, target.clientHeight);
@@ -603,6 +747,7 @@ export function createBoostballView(
     else renderer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    needsDraw = true;
   };
   const observer = new ResizeObserver(resize);
   observer.observe(target);
@@ -610,93 +755,159 @@ export function createBoostballView(
   const ballScreen = new T.Vector3();
   const ballPose = new T.Vector3(),
     desired = new T.Vector3(),
-    aim = new T.Vector3();
+    aim = new T.Vector3(),
+    ballTarget = new T.Vector3(),
+    carTarget = new T.Vector3(),
+    effectAt = new T.Vector3(),
+    rollAxis = new T.Vector3();
   return {
     software,
     draw(state, dt, mode) {
       dt = Math.min(0.05, Math.max(0, dt));
+      const changedCamera = mode !== previousMode;
+      if (dt === 0 && !changedCamera && !needsDraw) return;
+      const newKickoff =
+        firstFrame || (state.countdown > 0 && previousCountdown === 0);
+      const overheadChanged =
+        changedCamera && (previousMode === "stadium" || mode === "stadium");
+      previousMode = mode;
+      previousCountdown = state.countdown;
       time += dt;
       const blend = 1 - Math.exp(-dt * 18);
-      const bp = scale(state.ball.x, state.ball.y, state.ball.height ?? 17);
-      if (firstFrame || ballPose.distanceTo(bp) > 14) ballPose.copy(bp);
-      else ballPose.lerp(bp, blend);
+      ballTarget.set(
+        (state.ball.x - 480) / 12,
+        (state.ball.height ?? 17) / 12,
+        (state.ball.y - 270) / 12,
+      );
+      if (newKickoff) ballPose.copy(ballTarget);
+      else ballPose.lerp(ballTarget, blend);
       ballGroup.position.copy(ballPose);
-      ballGroup.rotation.z -= (state.ball.vx * dt) / 250;
-      ballGroup.rotation.x += (state.ball.vy * dt) / 250;
+      rollAxis.set(state.ball.vy, 0, -state.ball.vx);
+      const ballSpeed = rollAxis.length();
+      if (ballSpeed > 0.1) {
+        rollAxis.divideScalar(ballSpeed);
+        ballGroup.rotateOnWorldAxis(
+          rollAxis,
+          (ballSpeed * dt) / (ballPose.y < 1.5 ? 17 : 34),
+        );
+      }
       ballShadow.position.set(ballPose.x, 0.035, ballPose.z);
       ballShadow.scale.setScalar(1 + (ballPose.y - 1.4) * 0.08);
       ballShadowMat.opacity = Math.max(0.09, 0.35 - ballPose.y * 0.012);
       marker.position.set(ballPose.x, 0.045, ballPose.z);
+      marker.scale.setScalar(1 + Math.max(0, ballPose.y - 1.5) * 0.025);
       for (const c of state.cars) {
         const model = cars.get(c.id) ?? makeCar(c.id, c.name, c.team);
         model.root.visible = c.active;
         model.ring.visible = c.active && c.id === mine;
+        model.shadow.visible = c.active;
         if (!c.active) continue;
-        const p = scale(c.x, c.y, c.height ?? 0);
-        if (firstFrame || model.pose.distanceTo(p) > 12) model.pose.copy(p);
-        else model.pose.lerp(p, blend);
-        if (firstFrame) model.angle = c.angle;
-        else
-          model.angle +=
-            Math.atan2(
-              Math.sin(c.angle - model.angle),
-              Math.cos(c.angle - model.angle),
-            ) * blend;
+        carTarget.set((c.x - 480) / 12, (c.height ?? 0) / 12, (c.y - 270) / 12);
+        if (newKickoff) model.pose.copy(carTarget);
+        else model.pose.lerp(carTarget, blend);
+        const turn = Math.atan2(
+          Math.sin(c.angle - model.angle),
+          Math.cos(c.angle - model.angle),
+        );
+        if (newKickoff) model.angle = c.angle;
+        else model.angle += turn * blend;
         model.root.position.copy(model.pose);
         model.body.rotation.y = -model.angle;
         const speed = Math.hypot(c.vx, c.vy);
-        model.body.rotation.x =
-          -Math.sin(time * 13) * Math.min(0.025, speed / 18000);
+        const sideways = c.vy * Math.cos(c.angle) - c.vx * Math.sin(c.angle);
+        model.body.rotation.x = T.MathUtils.clamp(
+          sideways / (c.drifting ? 1100 : 2000),
+          -0.2,
+          0.2,
+        );
         model.body.rotation.z =
           c.height > 0
             ? Math.max(-0.25, Math.min(0.25, -c.vz / 800))
             : Math.sin(time * 11) * Math.min(0.015, speed / 20000);
-        if (c.cooldown > model.lastDodge + 0.7) model.flip = 1;
+        if (!newKickoff && c.cooldown > model.lastDodge + 0.7) model.flip = 1;
+        if (newKickoff) model.flip = 0;
         model.lastDodge = c.cooldown;
         if (model.flip > 0) {
           model.flip = Math.max(0, model.flip - dt * 3);
-          model.body.rotation.z -=
+          const roll =
             c.height > 2
               ? (1 - model.flip) * Math.PI * 2
-              : Math.sin(model.flip * Math.PI) * 0.14;
+              : Math.sin(model.flip * Math.PI) * 0.15;
+          if (Math.abs(c.dodgeSide ?? 0) > 0.1)
+            model.body.rotation.x += roll * Math.sign(c.dodgeSide ?? 0);
+          else model.body.rotation.z -= roll;
         }
-        for (const wheel of model.wheels) wheel.rotation.z -= (speed * dt) / 55;
+        for (const wheel of model.wheels) {
+          wheel.rotation.z -= (speed * dt) / 5.5;
+          if (wheel.position.x > 0)
+            wheel.rotation.y = T.MathUtils.clamp(turn * -1.2, -0.48, 0.48);
+        }
+        const boosting = c.boosting ?? (speed > 300 && c.fuel > 0);
         for (const flame of model.flames) {
-          flame.visible = speed > 300 && c.fuel > 0;
-          flame.scale.y = 0.6 + speed / 300 + Math.sin(time * 50) * 0.2;
+          flame.visible = boosting;
+          flame.scale.y = 0.85 + speed / 280 + Math.sin(time * 48) * 0.23;
         }
-        if (speed > 300 && c.fuel > 0)
-          emit(
-            model.pose
-              .clone()
-              .add(
-                new T.Vector3(
-                  -Math.cos(c.angle) * 2,
-                  0.75,
-                  -Math.sin(c.angle) * 2,
-                ),
-              ),
-            c.team ? ORANGE : BLUE,
-            1,
-            2,
+        if (dt && (boosting || (c.drifting && Math.abs(sideways) > 45))) {
+          effectAt.set(
+            model.pose.x - Math.cos(c.angle) * 2.15,
+            model.pose.y + (boosting ? 0.75 : 0.2),
+            model.pose.z - Math.sin(c.angle) * 2.15,
           );
-        model.ring.position.set(p.x, 0.05, p.z);
-        model.tag.position.y = 3.2;
+          emit(
+            effectAt,
+            boosting ? (c.team ? ORANGE : BLUE) : 0xd7b6a3,
+            1,
+            boosting ? 4 : 2,
+          );
+        }
+        if (!newKickoff && c.fuel - model.lastFuel > 19)
+          emit(model.pose, 0xffdc8a, 11, 7);
+        model.lastFuel = c.fuel;
+        model.ring.position.set(model.pose.x, 0.066, model.pose.z);
+        model.shadow.position.set(model.pose.x, 0.044, model.pose.z);
+        model.shadow.scale.set(
+          1.14 + model.pose.y * 0.026,
+          0.86 + model.pose.y * 0.026,
+          1,
+        );
+        model.shadow.rotation.z = -model.angle;
+        model.tag.position.y = 2.7;
+      }
+      const touch = state.lastTouch;
+      if (touch && touch.tick > lastTouch) {
+        lastTouch = touch.tick;
+        if (state.tick - touch.tick < 20) {
+          const hitAt = scale(touch.x, touch.y, touch.height);
+          emit(
+            hitAt,
+            0xffedbb,
+            Math.min(28, 5 + Math.floor(touch.speed / 18)),
+            10,
+          );
+        }
       }
       const total = state.score[0] + state.score[1];
       if (total > lastScore) {
         lastScore = total;
         goalFlash = 1;
-        const winning = state.goal.startsWith("BLUE") ? BLUE : ORANGE;
-        emit(
-          new T.Vector3(state.goal.startsWith("BLUE") ? 37 : -37, 3, 0),
-          winning,
-          110,
-          23,
+        const team =
+          state.lastGoal?.team ?? Number(!state.goal.startsWith("BLUE"));
+        const winning = team ? ORANGE : BLUE;
+        shock.position.copy(
+          state.lastGoal
+            ? scale(state.lastGoal.x, state.lastGoal.y, state.lastGoal.height)
+            : effectAt.set(team ? -37 : 37, 3, 0),
         );
+        shock.position.x = team ? -36.6 : 36.6;
+        shockMat.color.setHex(winning);
+        emit(shock.position, winning, 120, 29);
       }
-      goalFlash = Math.max(0, goalFlash - dt * 0.7);
-      sun.intensity = 3.2 + goalFlash * 2;
+      paintScore(state);
+      goalFlash = Math.max(0, goalFlash - dt * 0.87);
+      sun.intensity = 2.7 + goalFlash * 1.25;
+      shock.visible = goalFlash > 0;
+      shock.scale.setScalar(0.4 + (1 - goalFlash) * 7.5);
+      shockMat.opacity = goalFlash * 0.72;
       for (let i = 0; i < life.length; i++) {
         if (life[i] <= 0) {
           positions[i * 3 + 1] = -20;
@@ -712,8 +923,15 @@ export function createBoostballView(
       }
       particleGeo.attributes.position.needsUpdate = true;
       particleGeo.attributes.color.needsUpdate = true;
-      pads.forEach((pad, i) => {
-        pad.scale.setScalar(1 + Math.sin(time * 2 + i) * 0.05);
+      pads.forEach(({ base, ring, token }, i) => {
+        const cooldown = state.pads?.[i];
+        const present = cooldown !== undefined;
+        const ready = present && cooldown <= 0;
+        base.visible = ring.visible = present;
+        token.visible = ready;
+        ring.material = ready ? padReady : padSpent;
+        token.rotation.y = time * 2.5 + i;
+        token.position.y = 0.77 + Math.sin(time * 4 + i) * 0.19;
       });
       const player =
         state.cars.find((c) => c.id === mine && c.active) ??
@@ -738,26 +956,38 @@ export function createBoostballView(
           aim.y = Math.max(1, aim.y);
         } else aim.set(p.x + dx * 9, Math.max(1.4, p.y + 1.4), p.z + dz * 9);
         const speed = Math.hypot(player.vx, player.vy);
-        const distance = mode === "ball" ? 14 : 12 + speed / 140;
+        const portrait = camera.aspect < 0.9;
+        const distance =
+          (mode === "ball" ? 13.6 : 11.8) + speed / 160 + (portrait ? 2.5 : 0);
         desired.set(
           p.x - dx * distance,
-          Math.max(8, p.y + 7.5) + speed / 230,
+          Math.max(7.6, p.y + 6.9) + speed / 250 + (portrait ? 1.9 : 0),
           p.z - dz * distance,
         );
         // Keep the follow camera inside the walls for a clear view near goals.
-        desired.x = T.MathUtils.clamp(desired.x, 1 - END_WALL_X, END_WALL_X - 1);
-        desired.z = T.MathUtils.clamp(desired.z, 1 - SIDE_WALL_Z, SIDE_WALL_Z - 1);
+        desired.x = T.MathUtils.clamp(
+          desired.x,
+          1 - END_WALL_X,
+          END_WALL_X - 1,
+        );
+        desired.z = T.MathUtils.clamp(
+          desired.z,
+          1 - SIDE_WALL_Z,
+          SIDE_WALL_Z - 1,
+        );
         const followDistance = Math.hypot(desired.x - p.x, desired.z - p.z);
-        aim.lerp(p, Math.max(0, 1 - followDistance / distance));
+        const wall = Math.max(0, 1 - followDistance / distance);
+        aim.lerp(p, wall * 0.72);
+        desired.y += wall * 3.8;
         camera.fov =
-          62 + Math.min(10, speed / 50) + Math.max(0, 1.1 - camera.aspect) * 20;
+          60 + Math.min(9, speed / 65) + Math.max(0, 1.05 - camera.aspect) * 20;
       }
-      if (firstFrame) {
+      if (newKickoff || overheadChanged || dt === 0) {
         camera.position.copy(desired);
         look.copy(aim);
       } else {
-        camera.position.lerp(desired, 1 - Math.exp(-dt * 4.5));
-        look.lerp(aim, 1 - Math.exp(-dt * 7));
+        camera.position.lerp(desired, 1 - Math.exp(-dt * 6));
+        look.lerp(aim, 1 - Math.exp(-dt * 9));
       }
       camera.lookAt(look);
       camera.updateProjectionMatrix();
@@ -787,9 +1017,10 @@ export function createBoostballView(
         }
       }
       softwareFrame += dt;
-      if (!software || softwareFrame >= 1 / 24 || firstFrame) {
+      if (!software || softwareFrame >= 1 / 24 || needsDraw || changedCamera) {
         renderer.render(scene, camera);
         softwareFrame = 0;
+        needsDraw = false;
       }
       firstFrame = false;
     },

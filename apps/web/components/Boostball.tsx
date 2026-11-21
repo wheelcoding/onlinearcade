@@ -2,13 +2,14 @@
 import { useEffect, useRef, useState } from "react";
 import {
   BoostballSimulation,
+  BOOSTBALL_PADS,
   boostballBot,
   type BallInput,
   type BallState,
 } from "@onlinearcade/core";
 import type { OnlineRaceLink } from "../lib/use-party";
 import type { BallCamera, BallView } from "./games/boostball-view";
-import { Pause, Play } from "lucide-react";
+import { Pause, Play, Zap } from "lucide-react";
 import {
   PlayOptions,
   PlayScreen,
@@ -17,6 +18,73 @@ import {
   isGameInput,
 } from "./PlayScreen";
 import { createArcadeAudio } from "../lib/arcade-audio";
+
+const MATCH_CONNECTED = "Connected · server-controlled match";
+
+function ArenaMap({ state, mine }: { state: BallState; mine: string }) {
+  const point = (x: number, y: number) => ({ cx: 8 + x / 6, cy: 8 + y / 6 });
+  const pads = state.pads;
+  return (
+    <svg className="ball-minimap" viewBox="0 0 176 106" aria-hidden="true">
+      <rect
+        x="8"
+        y="8"
+        width="160"
+        height="90"
+        rx="6"
+        fill="#1b363b"
+        stroke="#8fbab388"
+      />
+      <path
+        d="M88 8v90M8 39h23v28H8m160-28h-23v28h23"
+        fill="none"
+        stroke="#8fbab372"
+      />
+      <circle cx="88" cy="53" r="15" fill="none" stroke="#8fbab372" />
+      <path
+        d="M5 43v20"
+        stroke="#79d7ff"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M171 43v20"
+        stroke="#ffb078"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+      {pads &&
+        BOOSTBALL_PADS.map((pad, index) => (
+          <circle
+            key={index}
+            {...point(pad.x, pad.y)}
+            r="2.2"
+            fill={pads[index] > 0 ? "#596765" : "#ffe884"}
+          />
+        ))}
+      {state.cars
+        .filter((car) => car.active)
+        .map((car) => (
+          <circle
+            key={car.id}
+            {...point(car.x, car.y)}
+            r={car.id === mine ? 4.2 : 3.3}
+            fill={car.team ? "#ffac70" : "#70cdff"}
+            stroke={car.id === mine ? "#fff6dc" : "#172830"}
+            strokeWidth="1.6"
+          />
+        ))}
+      <circle
+        {...point(state.ball.x, state.ball.y)}
+        r="3.2"
+        fill="#fff6d8"
+        stroke="#111c29"
+        strokeWidth="1"
+      />
+    </svg>
+  );
+}
+
 export default function Boostball({
   link,
   onClose,
@@ -27,6 +95,7 @@ export default function Boostball({
   onFriends: () => void;
 }) {
   const [attempt, setAttempt] = useState(0),
+    [practice, setPractice] = useState<"match" | "free">("match"),
     [hud, setHud] = useState<BallState | null>(null),
     [notice, setNotice] = useState("Loading stadium…"),
     [error, setError] = useState(""),
@@ -35,6 +104,7 @@ export default function Boostball({
     [muted, setMuted] = useState(false),
     [paused, setPaused] = useState(false);
   const cameraRef = useRef<BallCamera>("chase");
+  const freePlay = !link && practice === "free";
   cameraRef.current = cameraMode;
   const mount = useRef<HTMLDivElement>(null),
     indicator = useRef<HTMLDivElement>(null),
@@ -71,14 +141,23 @@ export default function Boostball({
       seq = Date.now(),
       lastPacket = performance.now(),
       hudAt = 0,
-      previousGoals = 0;
+      previousGoals = 0,
+      previousTouch = 0,
+      previousFuel = 100,
+      previousCount = 0;
     const mine = link?.memberId ?? "you";
     const sim = link
       ? null
-      : new BoostballSimulation([
-          { id: "you", name: "You" },
-          { id: "bot", name: "Sparky · AI" },
-        ]);
+      : new BoostballSimulation(
+          freePlay
+            ? [{ id: mine, name: "You" }]
+            : [
+                { id: mine, name: "You" },
+                { id: "bot", name: "Sparky · AI" },
+              ],
+          freePlay,
+        );
+    const soloInputs = new Map<string, BallInput>();
     let latest: BallState | null = sim?.state ?? null;
     setHud(null);
     setLoading(true);
@@ -92,6 +171,7 @@ export default function Boostball({
         Number(held.current.has("KeyD") || held.current.has("ArrowRight")) -
         Number(held.current.has("KeyA") || held.current.has("ArrowLeft")),
       boost: held.current.has("ShiftLeft") || held.current.has("ShiftRight"),
+      drift: held.current.has("KeyZ"),
       dodge: held.current.has("KeyX") || queued.current.dodge,
       jump: held.current.has("Space") || queued.current.jump,
     });
@@ -100,7 +180,7 @@ export default function Boostball({
         return;
       latest = p;
       lastPacket = performance.now();
-      setNotice("Connected · server-controlled match");
+      setNotice(MATCH_CONNECTED);
     };
     const reset = () => {
       queued.current = { jump: false, dodge: false };
@@ -193,13 +273,10 @@ export default function Boostball({
             previousFrame = now;
             if (sim && !pauseRef.current) {
               const tick = sim.state.tick;
-              sim.advance(
-                dt,
-                new Map([
-                  [mine, input()],
-                  ["bot", boostballBot(sim.state, "bot")],
-                ]),
-              );
+              soloInputs.set(mine, input());
+              if (!freePlay)
+                soloInputs.set("bot", boostballBot(sim.state, "bot"));
+              sim.advance(dt, soloInputs);
               if (sim.state.tick > tick)
                 queued.current = { jump: false, dodge: false };
               latest = sim.state;
@@ -209,18 +286,34 @@ export default function Boostball({
               const totalGoals = s.score[0] + s.score[1];
               if (totalGoals > previousGoals) audio.current?.cue("finish");
               previousGoals = totalGoals;
+              const count = Math.ceil(s.countdown);
+              if (count && count !== previousCount) audio.current?.cue("move");
+              if (!count && previousCount && !s.complete)
+                audio.current?.cue("kickoff");
+              previousCount = count;
+              if (s.lastTouch && s.lastTouch.tick > previousTouch) {
+                previousTouch = s.lastTouch.tick;
+                if (s.tick - previousTouch < 20)
+                  audio.current?.cue("ball-contact");
+              }
+              const fuel = s.cars.find((car) => car.id === mine)?.fuel ?? 100;
+              if (!count && fuel - previousFuel > 19)
+                audio.current?.cue("pickup");
+              previousFuel = fuel;
               if (now - hudAt > 100) {
                 hudAt = now;
                 setHud({
                   ...s,
                   score: [...s.score],
+                  ball: { ...s.ball },
+                  pads: s.pads && [...s.pads],
                   cars: s.cars.map((c) => ({ ...c })),
                 });
                 if (link && now - lastPacket > 3000 && !s.complete)
                   setNotice("Waiting for server snapshots…");
               }
               try {
-                view?.draw(s, dt, cameraRef.current);
+                view?.draw(s, pauseRef.current ? 0 : dt, cameraRef.current);
               } catch {
                 paused = true;
                 held.current.clear();
@@ -263,10 +356,15 @@ export default function Boostball({
       link?.socket.off("disconnect", disconnected);
       link?.socket.off("party:removed", removed);
     };
-  }, [link, attempt]);
+  }, [link, attempt, freePlay]);
   const car = hud?.cars.find((value) => value.id === (link?.memberId ?? "you"));
+  const upgradedRules = !link || !!hud?.pads;
   const score = hud?.score ?? [0, 0];
-  const seconds = Math.ceil(hud?.time ?? 180);
+  const seconds = hud?.overtime
+    ? Math.floor(hud.time)
+    : Math.ceil(hud?.time ?? 180);
+  const speed = car ? Math.round(Math.hypot(car.vx, car.vy) * 0.3) : 0;
+  const scorer = hud?.cars.find((player) => player.id === hud.lastGoal?.scorer);
   const restart = () => {
     pause(false);
     setAttempt((value) => value + 1);
@@ -296,13 +394,45 @@ export default function Boostball({
           <PlayOptions>
             <p>
               <strong>
-                Boostball {link ? "· Live party" : "· Practice vs Sparky (AI)"}
+                {link
+                  ? "Live party"
+                  : freePlay
+                    ? "Free play"
+                    : "Practice vs Sparky (AI)"}
               </strong>
             </p>
             <p>
-              WASD or arrows to drive. Shift boosts, Space jumps, X dodges, and
-              C changes camera. Jump and boost to reach high balls.
+              WASD or arrows to drive. Shift boosts, Space jumps and X dodges. C
+              switches camera.{" "}
+              {upgradedRules &&
+                "Hold Z to powerslide. Steer while dodging to change direction."}
             </p>
+            {upgradedRules && (
+              <p>Drive over a glowing gold pad for 35 boost.</p>
+            )}
+            {!link && (
+              <label>
+                Practice mode
+                <select
+                  value={practice}
+                  onChange={(event) => {
+                    pause(false);
+                    setPractice(
+                      event.target.value === "free" ? "free" : "match",
+                    );
+                    event.currentTarget
+                      .closest("details")
+                      ?.removeAttribute("open");
+                    mount.current?.parentElement?.focus({
+                      preventScroll: true,
+                    });
+                  }}
+                >
+                  <option value="match">Match vs Sparky</option>
+                  <option value="free">Free play</option>
+                </select>
+              </label>
+            )}
             <label>
               Camera
               <select
@@ -327,7 +457,9 @@ export default function Boostball({
             </button>
             {!link && (
               <>
-                <button onClick={restart}>Restart practice</button>
+                <button onClick={restart}>
+                  {freePlay ? "Reset field" : "Restart practice"}
+                </button>
                 <button onClick={onFriends}>Play with friends</button>
               </>
             )}
@@ -353,46 +485,77 @@ export default function Boostball({
       </div>
       <div
         className="ball-scoreboard play-hud"
+        role="group"
         aria-label="Boostball score and time"
       >
         <strong className="ball-blue">
-          Blue <b>{score[0]}</b>
+          <span>Blue</span> <b>{score[0]}</b>
         </strong>
-        <span>
-          {hud?.complete
-            ? "FT"
-            : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`}
-        </span>
+        <div className="ball-clock">
+          {hud?.overtime && <small>Overtime</small>}
+          <strong>
+            {hud?.complete
+              ? "FT"
+              : freePlay
+                ? "Free play"
+                : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`}
+          </strong>
+        </div>
         <strong className="ball-orange">
-          <b>{score[1]}</b> Orange
+          <b>{score[1]}</b> <span>Orange</span>
         </strong>
       </div>
       {hud && !hud.complete && (
         <>
-          {(hud.countdown > 0 ||
-            (link && notice !== "Connected · server-controlled match")) && (
+          {link && notice !== MATCH_CONNECTED ? (
             <p className="play-message" role="status">
-              {link && notice !== "Connected · server-controlled match"
-                ? notice
-                : `${hud.goal} · ${Math.ceil(hud.countdown)}`}
+              {notice}
             </p>
+          ) : (
+            hud.countdown > 0 && (
+              <div
+                className="ball-kickoff"
+                role="status"
+                data-team={
+                  hud.goal.includes("GOAL") ? hud.lastGoal?.team : undefined
+                }
+              >
+                <strong>{hud.goal}</strong>
+                {scorer && hud.goal.includes("GOAL") && (
+                  <span>{scorer.name}</span>
+                )}
+                <b>{Math.ceil(hud.countdown)}</b>
+              </div>
+            )
           )}
+          <ArenaMap state={hud} mine={link?.memberId ?? "you"} />
           <div className="play-corner ball-fuel">
-            <span>Boost</span>
-            <progress
-              className="play-meter"
-              max={100}
-              value={car?.fuel ?? 100}
-              aria-label="Boost fuel"
-            />
-            <strong>{Math.round(car?.fuel ?? 100)}%</strong>
-            <span>
-              {car && (car.height ?? 0) > 1
-                ? "Airborne"
-                : car?.cooldown
-                  ? `Dodge ${car.cooldown.toFixed(1)}s`
-                  : "Dodge ready"}
-            </span>
+            <div className="ball-speed">
+              <strong>{speed}</strong>
+              <small>KM/H</small>
+            </div>
+            <div className="ball-boost-meter">
+              <div>
+                <Zap size={14} aria-hidden="true" />
+                <span>Boost</span>
+                <strong>{Math.round(car?.fuel ?? 100)}%</strong>
+              </div>
+              <progress
+                className="play-meter"
+                max={100}
+                value={car?.fuel ?? 100}
+                aria-label="Boost fuel"
+              />
+              <small>
+                {car?.drifting
+                  ? "Powerslide"
+                  : car?.height && car.height > 1
+                    ? "Airborne"
+                    : car?.cooldown
+                      ? `Dodge ${car.cooldown.toFixed(1)}s`
+                      : "Dodge ready"}
+              </small>
+            </div>
           </div>
           <button
             className="play-camera-icon play-icon"
@@ -407,7 +570,11 @@ export default function Boostball({
                 : "Wide"}
           </button>
           <PlayTouchControls
-            left={driveKeys}
+            left={
+              upgradedRules
+                ? [...driveKeys, ["KeyZ", "Slide", "Powerslide"]]
+                : driveKeys
+            }
             right={[
               ["ArrowDown", "Brake"],
               ["ArrowUp", "Gas", "Accelerate"],
@@ -437,7 +604,7 @@ export default function Boostball({
               : hud?.complete
                 ? score[0] === score[1]
                   ? "Full-time draw"
-                  : `${score[0] > score[1] ? "Blue" : "Orange"} wins`
+                  : `${score[0] > score[1] ? "Blue" : "Orange"} wins${hud.overtime ? " in overtime" : ""}`
                 : paused
                   ? "Paused"
                   : loading
@@ -457,6 +624,8 @@ export default function Boostball({
                     className={player.team ? "ball-orange" : "ball-blue"}
                   >
                     {player.name}
+                    {!!player.goals &&
+                      ` · ${player.goals} ${player.goals === 1 ? "goal" : "goals"}`}
                     {player.active ? "" : " · left"}
                   </li>
                 ))}
